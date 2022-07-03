@@ -14,28 +14,29 @@ struct Signature {
 
 class Account {
     EC_KEY *privateKey = nullptr;
-    Address addressBytes;
+    Address address;
     std::shared_ptr<Context> context;
     bool canSign = false;
 
    public:
     Account() = delete;
-    inline explicit Account(const std::string &privateKeyHex, std::shared_ptr<Context> context = defaultContext) : Account(hexToBytes(privateKeyHex), context) {
+    inline explicit Account(const std::string &privateKeyHex, std::shared_ptr<Context> context = defaultContext) : Account(hexToBytes(privateKeyHex), context) {}
+
+    explicit Account(Address address, std::shared_ptr<Context> context = defaultContext) : address(address), context(context) {
         if (!context) {
             throw std::runtime_error("Context must be initalized");
         }
     }
 
     template <typename T>
-    explicit Account(const T &privateKey, std::shared_ptr<Context> context = defaultContext) : context(context) {
-        if (addressBytes.size() == 20) {
-            std::copy(addressBytes.begin(), addressBytes.end(), this->addressBytes.begin());
+    explicit Account(const T &privateKey, std::shared_ptr<Context> context = defaultContext) : context(context), canSign(true) {
+        if (!context) {
+            throw std::runtime_error("Context must be initalized");
         }
 
         if (privateKey.size() != 32) {
-            throw std::runtime_error("privateKey must be 32 bytes or address must be 20 bytes");
+            throw std::runtime_error("privateKey must be 32 bytes");
         }
-        canSign = true;
 
         this->privateKey = EC_KEY_new();
         if (!this->privateKey) {
@@ -95,8 +96,7 @@ class Account {
         memcpy(resultBuf.data(), buf + 1, 64);
         // std::cout << "Public key: " << toString(resultBuf) << std::endl;
         auto kec = keccak256(resultBuf);
-        std::copy(kec.begin() + 12, kec.end(), addressBytes.begin());
-        // std::cout << "Address: " << toString(addressBytes) << std::endl;
+        std::copy(kec.begin() + 12, kec.end(), address.bytes.begin());
 
         EC_POINT_free(pubKey);
     }
@@ -106,7 +106,7 @@ class Account {
         }
     }
     std::string getAddress() const {
-        return toString(addressBytes);
+        return toString(address.bytes);
     }
     boost::multiprecision::uint256_t getBalance() const {
         // std::string str = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBalance\",\"params\":[\"0x" + getAddress() + "\",\"latest\"],\"id\":5777}";

@@ -276,6 +276,12 @@ inline std::vector<unsigned char> arithmeticToBytes<bool>(bool val) {
     return {0};
 }
 
-typedef std::array<unsigned char, 20> Address;
+struct Address {
+    std::array<unsigned char, 20> bytes;
+    Address(const std::string &hex) : bytes(hexToBytes<std::array<unsigned char, 20>>(hex)) {}
+    Address() {
+        std::fill(bytes.begin(), bytes.end(), 0);
+    }
+};
 
 }  // namespace Web3

@@ -46,8 +46,9 @@ struct Context {
         while (running) {
             try {
                 ioContext.run();
-            } catch (const std::exception &e) {
-                std::cerr << "Error: " << e.what() << std::endl;
+            } catch (...) {
+                std::exception_ptr p = std::current_exception();
+                std::clog <<(p ? p.__cxa_exception_type()->name() : "null") << std::endl;
             }
         }
     }
@@ -57,7 +58,6 @@ struct Context {
         running = true;
         auto work = std::make_shared<boost::asio::io_service::work>(ioContext);
         runnerThread = std::thread(Context::runner, this);
-        runnerThread.detach();
     }
     inline std::string buildRPCJson(const std::string &method, const std::string &params) const {
         return "{\"jsonrpc\":\"2.0\",\"id\":" + std::to_string(chainId) + ",\"method\":\"" + method + "\",\"params\":" + params + "}";

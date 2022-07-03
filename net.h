@@ -76,15 +76,12 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
 
         // asynchronously and gracefully shutdown the connection so we can return now even if the server is slow to close the stream
         stream->lowest_layer().cancel();
-        // stream->async_shutdown(
-        //     [stream](const boost::system::error_code &ec) {
-        //         if (ec) {
-        //             std::cerr << "Error shutting down SSL stream: " << ec.message() << std::endl;
-        //         }
-        // });
-        // context_->ioContext.post([stream]() {
-        //     std::cout << "Idk why we segfaulting" << std::endl;
-        // });
+        stream->async_shutdown(
+            [stream](const boost::system::error_code &ec) {
+                if (ec) {
+                    std::cerr << "Error shutting down SSL stream: " << ec.message() << std::endl;
+                }
+        });
 
         return ret;
     }

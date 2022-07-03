@@ -14,6 +14,7 @@ This library depends only on some boost libraries and openssl.
 * Monitoring pending and completed transactions
 * Make sure that things are actually thread safe
 * Better testing coverage
+* Make utility and encoding work with negative numbers
 
 ### Longer term features
 

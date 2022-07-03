@@ -335,8 +335,17 @@ class Account {
     }
     void sendRawTransaction(const std::string &tx) {
         auto str = context->buildRPCJson("eth_sendRawTransaction", "[\"0x" + tx + "\"]");
-        auto results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
-        std::cout << "TX: " << results << std::endl;
+        boost::json::value results;
+        try {
+            results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
+        } catch (const std::exception &e) {
+            throw std::runtime_error("Unable to send raw transaction: " + std::string(e.what()));
+        }
+        if (results.as_object().contains("error")) {
+            std::cout << "Unable to send raw transaction: " << results.at("error").at("message").as_string() << std::endl;
+            return;
+        }
+        std::cout << "TX: " << results.at("result") << std::endl;
     }
 };
 

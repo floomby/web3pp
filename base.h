@@ -10,6 +10,33 @@
 #include <memory>
 #include <string>
 
+#ifdef _WIN32
+#include <wincrypt.h>
+void add_windows_root_certs(boost::asio::ssl::context &ctx) {
+    HCERTSTORE hStore = CertOpenSystemStore(0, "ROOT");
+    if (hStore == NULL) {
+        return;
+    }
+
+    X509_STORE *store = X509_STORE_new();
+    PCCERT_CONTEXT pContext = NULL;
+    while ((pContext = CertEnumCertificatesInStore(hStore, pContext)) != NULL) {
+        // convert from DER to internal format
+        X509 *x509 = d2i_X509(NULL, (const unsigned char **)&pContext->pbCertEncoded, pContext->cbCertEncoded);
+        if (x509 != NULL) {
+            X509_STORE_add_cert(store, x509);
+            X509_free(x509);
+        }
+    }
+
+    CertFreeCertificateContext(pContext);
+    CertCloseStore(hStore, 0);
+
+    // attach X509_STORE to boost ssl context
+    SSL_CTX_set_cert_store(ctx.native_handle(), store);
+}
+#endif
+
 namespace Web3 {
 
 struct Context {
@@ -27,7 +54,7 @@ struct Context {
     } crypto;
     std::thread runnerThread;
     inline explicit Context(std::string host, std::string port, unsigned chainId, bool useSsl = false)
-        : host(host), port(port), chainId(chainId), ioContext(), resolver(ioContext), endpoints(resolver.resolve(host, port)), sslContext(boost::asio::ssl::context::sslv23), useSsl(useSsl) {
+        : host(host), port(port), chainId(chainId), ioContext(), resolver(ioContext), endpoints(resolver.resolve(host, port)), sslContext(boost::asio::ssl::context::tlsv12_client), useSsl(useSsl) {
         crypto.group = EC_GROUP_new_by_curve_name(NID_secp256k1);
         const char *pMinusN = "432420386565659656852420866390673177326";
         BN_dec2bn(&crypto.pMinusN, pMinusN);
@@ -35,8 +62,12 @@ struct Context {
             throw std::runtime_error("Crypto context initialization failed");
         }
         if (useSsl) {
+#ifndef _WIN32
             sslContext.set_default_verify_paths();
-            sslContext.set_verify_mode(boost::asio::ssl::verify_none);
+#else
+            add_windows_root_certs(sslContext);
+#endif
+            sslContext.set_verify_mode(boost::asio::ssl::verify_peer);
         }
     }
     inline std::string hostString() const { return host + ":" + port; }
@@ -48,7 +79,7 @@ struct Context {
                 ioContext.run();
             } catch (...) {
                 std::exception_ptr p = std::current_exception();
-                std::clog <<(p ? p.__cxa_exception_type()->name() : "null") << std::endl;
+                std::clog << (p ? p.__cxa_exception_type()->name() : "null") << std::endl;
             }
         }
     }

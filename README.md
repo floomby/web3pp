@@ -10,9 +10,7 @@ This library depends only on some boost libraries and openssl.
 
 * Stuff to help with contract interactions
 * Event subscriptions/past event searching
-* Add ssl support
 * Monitoring pending and completed transactions
-* Make sure that things are actually thread safe
 * Better testing coverage
 * Make utility and encoding work with negative numbers
 

@@ -4,6 +4,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/random/random_device.hpp>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -12,6 +13,9 @@
 #include <vector>
 
 #include "keccak.h"
+
+template <class... T>
+constexpr bool always_false = false;
 
 namespace Web3 {
 
@@ -47,8 +51,14 @@ boost::multiprecision::uint256_t fromBytes(const T &bytes) {
     return ret;
 }
 
-inline boost::multiprecision::uint256_t fromString(const std::string &str) {
-    return boost::multiprecision::cpp_int(str).convert_to<boost::multiprecision::uint256_t>();
+template <bool isSigned> struct Signedness {};
+
+template <> struct Signedness<true> { typedef boost::multiprecision::int256_t Type; };
+
+template <> struct Signedness<false> { typedef boost::multiprecision::uint256_t Type; };
+
+template <bool isSigned = false> Signedness<isSigned>::Type fromString(const std::string &str) {
+    return boost::multiprecision::cpp_int(str).convert_to<typename Signedness<isSigned>::Type>();
 }
 
 template <size_t N>
@@ -87,6 +97,15 @@ std::vector<T> &unpadFront(std::vector<T> &v) {
     return v;
 }
 
+template <typename T>
+std::vector<T> &&padFrontTo(std::vector<T> &&v, size_t n, bool isSigned = false) {
+    T pad = isSigned && v[0] & T(1) << (sizeof(T) * 8 - 1) ? -1 : 0;
+    while (v.size() < n) {
+        v.insert(v.begin(), pad);
+    }
+    return std::move(v);
+}
+
 inline std::vector<unsigned char> hexToBytes(const std::string &hex) {
     std::vector<unsigned char> bytes;
     if (hex.length() % 2 != 0) {
@@ -97,6 +116,16 @@ inline std::vector<unsigned char> hexToBytes(const std::string &hex) {
         bytes.push_back(byte);
     }
     return bytes;
+}
+
+inline boost::json::value parseFile(const std::string &filename) {
+    std::ifstream ifs(filename);
+    if (!ifs.is_open()) {
+        throw std::runtime_error("Could not open file");
+    }
+    std::stringstream ss;
+    ss << ifs.rdbuf();
+    return boost::json::parse(ss.str());
 }
 
 inline void prettyPrint(std::ostream &os, boost::json::value const &jv, std::string *indent = nullptr) {
@@ -180,6 +209,20 @@ inline void prettyPrint(std::ostream &os, boost::json::value const &jv, std::str
 inline std::vector<unsigned char> arithmeticToBytes(const boost::multiprecision::uint256_t &val) {
     std::vector<unsigned char> ret;
     boost::multiprecision::export_bits(val, std::back_inserter(ret), 8);
+    return ret;
+}
+
+inline std::vector<unsigned char> arithmeticToBytes(const boost::multiprecision::int256_t &val) {
+    std::vector<unsigned char> ret;
+    if (val.sign() == -1) {
+        auto tmp = val + 1;
+        boost::multiprecision::export_bits(tmp, std::back_inserter(ret), 8);
+        for (auto &byte : ret) {
+            byte = byte ^ 0xFF;
+        }
+    } else {
+        boost::multiprecision::export_bits(val, std::back_inserter(ret), 8);
+    }
     return ret;
 }
 

@@ -24,9 +24,15 @@
 #include "encoder.h"
 #include "transaction.h"
 #include "utility.h"
+#include "abi.h"
 
 int main(int argc, char **argv) {
     try {
+
+        std::cout << Web3::toString(Web3::Encoder::ABIEncode(Web3::fromString<true>(argv[1]))) << std::endl;
+
+        return EXIT_SUCCESS;
+
         // Web3::defaultContext = std::make_shared<Web3::Context>("127.0.0.1", "7545", 1);
         Web3::defaultContext = std::make_shared<Web3::Context>("rpc.sepolia.dev", "443", 11155111, true);
         Web3::defaultContext->run();

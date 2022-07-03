@@ -1,14 +1,11 @@
 #pragma once
 
+#include "utility.h"
+
 #include <bit>
 #include <cassert>
-#include <iomanip>
 #include <numeric>
 #include <optional>
-#include <string>
-#include <sstream>
-#include <vector>
-
 
 namespace Web3 {
 
@@ -25,6 +22,15 @@ std::string encode(const std::vector<unsigned char> &data) {
 template <typename T>
 std::string encode(const T &data) {
     static_assert(std::is_arithmetic<T>::value, "T must be arithmetic");
+    if (data == 0) {
+        return "0x0";
+    }
+    std::stringstream ss;
+    ss << std::showbase << std::hex << data;
+    return ss.str();
+}
+
+std::string encode(const boost::multiprecision::uint256_t &data) {
     if (data == 0) {
         return "0x0";
     }

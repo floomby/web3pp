@@ -187,13 +187,14 @@ template <typename T>
 std::vector<unsigned char> arithmeticToBytes(T val) {
     static_assert(std::is_arithmetic<T>::value, "T must be arithmetic");
     std::vector<unsigned char> bytes;
+    if constexpr (std::endian::native == std::endian::big) {
+        val = std::byteswap(val);
+    }
     while (val) {
         bytes.push_back(val & 0xff);
         val >>= 8;
     }
-    if constexpr (std::endian::native == std::endian::little) {
-        std::reverse(bytes.begin(), bytes.end());
-    }
+    std::reverse(bytes.begin(), bytes.end());
     return bytes;
 }
 

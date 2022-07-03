@@ -1,13 +1,11 @@
 #pragma once
 
-#include <iostream>
-#include <vector>
-
 #include "base.h"
 #include "net.h"
 #include "utility.h"
 
 namespace Web3 {
+
 struct Signature {
     std::vector<unsigned char> v;
     std::vector<unsigned char> r;
@@ -15,33 +13,36 @@ struct Signature {
 };
 
 class Account {
-    EC_KEY *privateKey;
+    EC_KEY *privateKey = nullptr;
     std::array<unsigned char, 20> addressBytes;
-    bool canSign_ = false;
-    std::shared_ptr<Context> context_;
+    std::shared_ptr<Context> context;
+    bool canSign = false;
 
    public:
     Account() = delete;
-    explicit Account(const std::string &privateKeyHex, std::shared_ptr<Context> context = defaultContext) : Account(hexToBytes(privateKeyHex), context) {
+    inline explicit Account(const std::string &privateKeyHex, std::shared_ptr<Context> context = defaultContext) : Account(hexToBytes(privateKeyHex), context) {
         if (!context) {
             throw std::runtime_error("Context must be initalized");
         }
     }
 
     template <typename T>
-    explicit Account(const T &privateKey, std::shared_ptr<Context> context = defaultContext) : context_(context) {
-        canSign_ = true;
+    explicit Account(const T &privateKey, std::shared_ptr<Context> context = defaultContext) : context(context) {
+        if (addressBytes.size() == 20) {
+            std::copy(addressBytes.begin(), addressBytes.end(), this->addressBytes.begin());
+        }
 
         if (privateKey.size() != 32) {
-            throw std::runtime_error("privateKey must be 32 bytes");
+            throw std::runtime_error("privateKey must be 32 bytes or address must be 20 bytes");
         }
+        canSign = true;
 
         this->privateKey = EC_KEY_new();
         if (!this->privateKey) {
             throw std::runtime_error("Unable to create EC key");
         }
 
-        if (!EC_KEY_set_group(this->privateKey, context_->crypto.group)) {
+        if (!EC_KEY_set_group(this->privateKey, context->crypto.group)) {
             EC_KEY_free(this->privateKey);
             throw std::runtime_error("Unable to set EC group");
         }
@@ -58,7 +59,7 @@ class Account {
             throw std::runtime_error("Unable to set private key");
         }
 
-        EC_POINT *pubKey = EC_POINT_new(context_->crypto.group);
+        EC_POINT *pubKey = EC_POINT_new(context->crypto.group);
         if (!pubKey) {
             EC_KEY_free(this->privateKey);
             BN_free(tmpKey);
@@ -67,7 +68,7 @@ class Account {
 
         // std::cout << "public key: ";
 
-        if (!EC_POINT_mul(context_->crypto.group, pubKey, tmpKey, NULL, NULL, NULL)) {
+        if (!EC_POINT_mul(context->crypto.group, pubKey, tmpKey, NULL, NULL, NULL)) {
             EC_KEY_free(this->privateKey);
             EC_POINT_free(pubKey);
             BN_free(tmpKey);
@@ -88,7 +89,7 @@ class Account {
         }
 
         unsigned char *buf = NULL;
-        auto size = EC_POINT_point2buf(context_->crypto.group, pubKey, POINT_CONVERSION_UNCOMPRESSED, &buf, NULL);
+        auto size = EC_POINT_point2buf(context->crypto.group, pubKey, POINT_CONVERSION_UNCOMPRESSED, &buf, NULL);
         std::array<unsigned char, 64> resultBuf;
         assert(size == 65);
         memcpy(resultBuf.data(), buf + 1, 64);
@@ -100,22 +101,25 @@ class Account {
         EC_POINT_free(pubKey);
     }
     ~Account() {
-        EC_KEY_free(privateKey);
+        if (privateKey) {
+            EC_KEY_free(privateKey);
+        }
     }
     std::string getAddress() const {
         return toString(addressBytes);
     }
-    bool canSign() const {
-        return canSign_;
-    }
     boost::multiprecision::uint256_t getBalance() const {
         // std::string str = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBalance\",\"params\":[\"0x" + getAddress() + "\",\"latest\"],\"id\":5777}";
-        auto str = context_->buildRPCJson("eth_getBalance", "[\"0x" + getAddress() + "\",\"latest\"]");
-        auto results = std::make_shared<Web3::Net::SyncRPC>(context_, std::move(str))->call();
+        auto str = context->buildRPCJson("eth_getBalance", "[\"0x" + getAddress() + "\",\"latest\"]");
+        auto results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
         return fromString(value_to<std::string>(results.at("result")));
     }
     // TODO Not sure all the error handling is correct (I am not experienced with openssl)
     Signature sign(const std::array<unsigned char, 32> &hash, bool eip2 = true, unsigned char kNonce = 0, BN_CTX *ctx = NULL) const {
+        if (!canSign) {
+            throw std::runtime_error("Account is not able to sign");
+        }
+
         // The low level openssl ecdsa signature api is not well suited for key recovery (the api is deprecated anyways for "public" use).
         // Note that this uses a variation on rfc6979 deterministic signing that is compatible with eip 2 singing
 
@@ -150,7 +154,7 @@ class Account {
             throw std::runtime_error("Unable to create BN h");
         }
 
-        auto order = EC_GROUP_get0_order(context_->crypto.group);
+        auto order = EC_GROUP_get0_order(context->crypto.group);
         if (!order) {
             BN_free(h);
             BN_free(k);
@@ -161,7 +165,7 @@ class Account {
         // BN_print_fp(stdout, order);
         // std::cout << std::endl;
 
-        auto R = EC_POINT_new(context_->crypto.group);
+        auto R = EC_POINT_new(context->crypto.group);
         if (!R) {
             BN_free(h);
             BN_free(k);
@@ -169,7 +173,7 @@ class Account {
             throw std::runtime_error("Unable to create R");
         }
 
-        if (!EC_POINT_mul(context_->crypto.group, R, k, NULL, NULL, ctx)) {
+        if (!EC_POINT_mul(context->crypto.group, R, k, NULL, NULL, ctx)) {
             EC_POINT_free(R);
             BN_free(h);
             BN_free(k);
@@ -190,7 +194,7 @@ class Account {
 
         auto x = BN_new();
         auto y = BN_new();
-        EC_POINT_get_affine_coordinates(context_->crypto.group, R, x, y, ctx);
+        EC_POINT_get_affine_coordinates(context->crypto.group, R, x, y, ctx);
         if (!x || !y) {
             if (x) {
                 BN_free(x);
@@ -207,7 +211,7 @@ class Account {
         }
 
         // Avoid having to set the second bit of the recovery id as per ethereum spec
-        if (BN_cmp(x, context_->crypto.pMinusN) == -1) {
+        if (BN_cmp(x, context->crypto.pMinusN) == -1) {
             BN_free(x);
             BN_free(y);
             EC_POINT_free(R);
@@ -317,7 +321,7 @@ class Account {
         // printf("\n");
 
         // Legacy with EIP 155 protection
-        auto v = arithmeticToBytes(context_->chainId * 2 + 35 + parity);
+        auto v = arithmeticToBytes(context->chainId * 2 + 35 + parity);
         std::copy(v.begin(), v.end(), std::back_inserter(ret.v));
 
         BN_free(x);
@@ -330,8 +334,8 @@ class Account {
         return ret;
     }
     void sendRawTransaction(const std::string &tx) {
-        auto str = context_->buildRPCJson("eth_sendRawTransaction", "[\"0x" + tx + "\"]");
-        auto results = std::make_shared<Web3::Net::SyncRPC>(context_, std::move(str))->call();
+        auto str = context->buildRPCJson("eth_sendRawTransaction", "[\"0x" + tx + "\"]");
+        auto results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
         std::cout << "TX: " << results << std::endl;
     }
 };

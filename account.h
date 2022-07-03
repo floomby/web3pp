@@ -321,7 +321,7 @@ class Account {
         // printf("\n");
 
         // Legacy with EIP 155 protection
-        auto v = arithmeticToBytes(context->chainId * 2 + 35 + parity);
+        auto v = integralToBytes(context->chainId * 2 + 35 + parity);
         std::copy(v.begin(), v.end(), std::back_inserter(ret.v));
 
         BN_free(x);

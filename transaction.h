@@ -15,12 +15,12 @@ class Transaction {
     std::vector<unsigned char> data;
     Signature signature;
     std::vector<unsigned char> sign(const Account &account, std::shared_ptr<Context> context = nullptr) {
-        Encoder::RLPEncodeInput nonce(arithmeticToBytes(this->nonce));
-        Encoder::RLPEncodeInput gasPrice(arithmeticToBytes(this->gasPrice));
-        Encoder::RLPEncodeInput gasLimit(arithmeticToBytes(this->gasLimit));
+        Encoder::RLPEncodeInput nonce(integralToBytes(this->nonce));
+        Encoder::RLPEncodeInput gasPrice(integralToBytes(this->gasPrice));
+        Encoder::RLPEncodeInput gasLimit(integralToBytes(this->gasLimit));
         Encoder::RLPEncodeInput to(this->to);
-        Encoder::RLPEncodeInput value(arithmeticToBytes(this->value));
-        Encoder::RLPEncodeInput chainId(arithmeticToBytes(context ? context->chainId : defaultContext->chainId));
+        Encoder::RLPEncodeInput value(integralToBytes(this->value));
+        Encoder::RLPEncodeInput chainId(integralToBytes(context ? context->chainId : defaultContext->chainId));
         Encoder::RLPEncodeInput empty(std::vector<unsigned char>({}));
 
         Encoder::RLPEncodeInput txrlp({ nonce, gasPrice, gasLimit, to, value, empty, chainId, empty, empty });

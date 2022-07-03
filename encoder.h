@@ -21,7 +21,7 @@ std::string encode(const std::vector<unsigned char> &data) {
 
 template <typename T>
 std::string encode(const T &data) {
-    static_assert(std::is_arithmetic<T>::value, "T must be arithmetic");
+    static_assert(std::is_integral<T>::value, "T must be integral");
     if (data == 0) {
         return "0x0";
     }

@@ -14,13 +14,11 @@
 
 #include "keccak.h"
 
-template <class... T>
-constexpr bool always_false = false;
+template <class... T> constexpr bool always_false = false;
 
 namespace Web3 {
 
-template <size_t N>
-std::array<unsigned char, N> randomBytes() {
+template <size_t N> std::array<unsigned char, N> randomBytes() {
     boost::random::random_device rd;
     std::array<unsigned char, N> tmp;
     rd.generate(tmp.data(), tmp.data() + tmp.size());
@@ -33,16 +31,14 @@ inline boost::multiprecision::uint256_t fromBytes(const std::vector<unsigned cha
     return ret;
 }
 
-template <size_t N>
-boost::multiprecision::uint256_t fromBytes(const std::array<unsigned char, N> &bytes) {
+template <size_t N> boost::multiprecision::uint256_t fromBytes(const std::array<unsigned char, N> &bytes) {
     static_assert(N == 32, "Only 32 bytes are supported");
     boost::multiprecision::uint256_t ret;
     boost::multiprecision::import_bits(ret, bytes.data(), bytes.data() + bytes.size(), 0, true);
     return ret;
 }
 
-template <typename T>
-boost::multiprecision::uint256_t fromBytes(const T &bytes) {
+template <typename T> boost::multiprecision::uint256_t fromBytes(const T &bytes) {
     if (bytes.size() > 32) {
         throw std::runtime_error("Up to 32 bytes are supported");
     }
@@ -51,22 +47,17 @@ boost::multiprecision::uint256_t fromBytes(const T &bytes) {
     return ret;
 }
 
-template <bool isSigned>
-struct Signedness {};
+template <bool isSigned> struct Signedness {};
 
-template <>
-struct Signedness<true> { typedef boost::multiprecision::int256_t Type; };
+template <> struct Signedness<true> { typedef boost::multiprecision::int256_t Type; };
 
-template <>
-struct Signedness<false> { typedef boost::multiprecision::uint256_t Type; };
+template <> struct Signedness<false> { typedef boost::multiprecision::uint256_t Type; };
 
-template <bool isSigned = false>
-Signedness<isSigned>::Type fromString(const std::string &str) {
+template <bool isSigned = false> Signedness<isSigned>::Type fromString(const std::string &str) {
     return boost::multiprecision::cpp_int(str).convert_to<typename Signedness<isSigned>::Type>();
 }
 
-template <size_t N>
-std::string toString(const std::array<unsigned char, N> &bytes) {
+template <size_t N> std::string toString(const std::array<unsigned char, N> &bytes) {
     std::stringstream ss;
     for (unsigned i = 0; i < bytes.size(); i++) {
         ss << std::hex << std::setw(2) << std::setfill('0') << (int)bytes[i];
@@ -88,8 +79,7 @@ inline std::string toString(const boost::multiprecision::uint256_t &num) {
     return ss.str();
 }
 
-template <typename T>
-std::vector<T> &unpadFront(std::vector<T> &v) {
+template <typename T> std::vector<T> &unpadFront(std::vector<T> &v) {
     auto it = v.begin();
     while (!v.empty() && v.front() == 0) {
         it++;
@@ -101,29 +91,37 @@ std::vector<T> &unpadFront(std::vector<T> &v) {
     return v;
 }
 
-template <typename T>
-std::vector<T> padFrontTo(std::vector<T> &&v, size_t n, bool isSigned = false) {
+template <typename T> std::vector<T> padFrontTo(std::vector<T> &&v, size_t n, bool isSigned = false) {
     T pad = isSigned && v[0] & T(1) << (sizeof(T) * 8 - 1) ? -1 : 0;
-    while (v.size() < n) {
-        v.insert(v.begin(), pad);
-    }
+    // compiler probably vectorizes this
+    while (v.size() < n) v.insert(v.begin(), pad);
     return v;
 }
 
-template <typename T, size_t N>
-std::vector<T> padFrontTo(const std::array<T, N> &a, size_t n) {
+template <typename T, size_t N> std::vector<T> padFrontTo(const std::array<T, N> &a, size_t n) {
     std::vector<T> v(a.begin(), a.end());;
     return padFrontTo(std::move(v), n);
 }
 
-template <class T>
-struct is_std_array : std::is_array<T> {};
+template <typename T> std::vector<T> padBackTo(std::vector<T> &&v, size_t n) {
+    if (v.size() < n) v.resize(n, 0);
+    return v;
+}
 
-template <class T, std::size_t N>
-struct is_std_array<std::array<T, N>> : std::true_type {};
+template <typename T, size_t N> std::vector<T> padBackTo(const std::array<T, N> &a, size_t n) {
+    std::vector<T> v(a.begin(), a.end());;
+    return padBackTo(std::move(v), n);
+}
 
-template <typename T = std::vector<unsigned char>>
-T hexToBytes(const std::string &hex) {
+template <class T> struct is_std_array : std::is_array<T> {};
+
+template <class T, std::size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
+
+template <class T> struct std_array_size { static_assert(always_false<T>, "Not a std::array"); };
+
+template <typename T, size_t N> struct std_array_size<std::array<T, N>> { static constexpr size_t value = N; };
+
+template <typename T = std::vector<unsigned char>> T hexToBytes(const std::string &hex) {
     auto offset = hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X') ? 2 : 0;
     T bytes;
     if (hex.length() % 2 != 0) {
@@ -233,13 +231,13 @@ inline void prettyPrint(std::ostream &os, boost::json::value const &jv, std::str
         os << "\n";
 }
 
-inline std::vector<unsigned char> arithmeticToBytes(const boost::multiprecision::uint256_t &val) {
+inline std::vector<unsigned char> integralToBytes(const boost::multiprecision::uint256_t &val) {
     std::vector<unsigned char> ret;
     boost::multiprecision::export_bits(val, std::back_inserter(ret), 8);
     return ret;
 }
 
-inline std::vector<unsigned char> arithmeticToBytes(const boost::multiprecision::int256_t &val) {
+inline std::vector<unsigned char> integralToBytes(const boost::multiprecision::int256_t &val) {
     std::vector<unsigned char> ret;
     if (val.sign() == -1) {
         auto tmp = val + 1;
@@ -253,14 +251,13 @@ inline std::vector<unsigned char> arithmeticToBytes(const boost::multiprecision:
     return ret;
 }
 
-template <typename T>
-std::vector<unsigned char> arithmeticToBytes(T val) {
-    static_assert(std::is_arithmetic<T>::value, "T must be arithmetic");
+template <typename T> std::vector<unsigned char> integralToBytes(T val) {
+    static_assert(std::is_integral<T>::value, "T must be integral");
     std::vector<unsigned char> bytes;
     if constexpr (std::endian::native == std::endian::big) {
         val = std::byteswap(val);
     }
-    // right shift on signed is implementation dependant as to whether it is logical or arithmetic
+    // right shift on signed is implementation dependant as to whether it is logical or integral
     auto asUnsigned = static_cast<std::make_unsigned<T>::type>(val);
     while (asUnsigned) {
         bytes.push_back(asUnsigned & 0xff);
@@ -270,8 +267,7 @@ std::vector<unsigned char> arithmeticToBytes(T val) {
     return bytes;
 }
 
-template <>
-inline std::vector<unsigned char> arithmeticToBytes<bool>(bool val) {
+template <> inline std::vector<unsigned char> integralToBytes<bool>(bool val) {
     if (val) return {1};
     return {0};
 }

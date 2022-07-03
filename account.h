@@ -14,7 +14,7 @@ struct Signature {
 
 class Account {
     EC_KEY *privateKey = nullptr;
-    std::array<unsigned char, 20> addressBytes;
+    Address addressBytes;
     std::shared_ptr<Context> context;
     bool canSign = false;
 

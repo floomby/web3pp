@@ -51,13 +51,17 @@ boost::multiprecision::uint256_t fromBytes(const T &bytes) {
     return ret;
 }
 
-template <bool isSigned> struct Signedness {};
+template <bool isSigned>
+struct Signedness {};
 
-template <> struct Signedness<true> { typedef boost::multiprecision::int256_t Type; };
+template <>
+struct Signedness<true> { typedef boost::multiprecision::int256_t Type; };
 
-template <> struct Signedness<false> { typedef boost::multiprecision::uint256_t Type; };
+template <>
+struct Signedness<false> { typedef boost::multiprecision::uint256_t Type; };
 
-template <bool isSigned = false> Signedness<isSigned>::Type fromString(const std::string &str) {
+template <bool isSigned = false>
+Signedness<isSigned>::Type fromString(const std::string &str) {
     return boost::multiprecision::cpp_int(str).convert_to<typename Signedness<isSigned>::Type>();
 }
 
@@ -98,22 +102,45 @@ std::vector<T> &unpadFront(std::vector<T> &v) {
 }
 
 template <typename T>
-std::vector<T> &&padFrontTo(std::vector<T> &&v, size_t n, bool isSigned = false) {
+std::vector<T> padFrontTo(std::vector<T> &&v, size_t n, bool isSigned = false) {
     T pad = isSigned && v[0] & T(1) << (sizeof(T) * 8 - 1) ? -1 : 0;
     while (v.size() < n) {
         v.insert(v.begin(), pad);
     }
-    return std::move(v);
+    return v;
 }
 
-inline std::vector<unsigned char> hexToBytes(const std::string &hex) {
-    std::vector<unsigned char> bytes;
+template <typename T, size_t N>
+std::vector<T> padFrontTo(const std::array<T, N> &a, size_t n) {
+    std::vector<T> v(a.begin(), a.end());;
+    return padFrontTo(std::move(v), n);
+}
+
+template <class T>
+struct is_std_array : std::is_array<T> {};
+
+template <class T, std::size_t N>
+struct is_std_array<std::array<T, N>> : std::true_type {};
+
+template <typename T = std::vector<unsigned char>>
+T hexToBytes(const std::string &hex) {
+    auto offset = hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X') ? 2 : 0;
+    T bytes;
     if (hex.length() % 2 != 0) {
         throw std::runtime_error("Invalid hex string");
     }
+    if constexpr (is_std_array<T>::value) {
+        if ((hex.length()  - offset) / 2 != bytes.size()) {
+            throw std::runtime_error("Invalid hex string (length mismatch to fixed size container)");
+        }
+    }
     for (unsigned int i = 0; i < hex.length(); i += 2) {
-        char byte = (char)std::strtol(hex.substr(i, 2).c_str(), NULL, 16);
-        bytes.push_back(byte);
+        char byte = (char)std::strtol(hex.substr(i + offset, 2).c_str(), NULL, 16);
+        if constexpr (is_std_array<T>::value) {
+            bytes[i / 2] = byte;
+        } else {
+            bytes.push_back(byte);
+        }
     }
     return bytes;
 }
@@ -233,12 +260,22 @@ std::vector<unsigned char> arithmeticToBytes(T val) {
     if constexpr (std::endian::native == std::endian::big) {
         val = std::byteswap(val);
     }
-    while (val) {
-        bytes.push_back(val & 0xff);
-        val >>= 8;
+    // right shift on signed is implementation dependant as to whether it is logical or arithmetic
+    auto asUnsigned = static_cast<std::make_unsigned<T>::type>(val);
+    while (asUnsigned) {
+        bytes.push_back(asUnsigned & 0xff);
+        asUnsigned >>= 8;
     }
     std::reverse(bytes.begin(), bytes.end());
     return bytes;
 }
+
+template <>
+inline std::vector<unsigned char> arithmeticToBytes<bool>(bool val) {
+    if (val) return {1};
+    return {0};
+}
+
+typedef std::array<unsigned char, 20> Address;
 
 }  // namespace Web3

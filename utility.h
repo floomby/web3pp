@@ -3,6 +3,7 @@
 #include <boost/json.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/random/random_device.hpp>
 #include <fstream>
 #include <iomanip>
@@ -49,12 +50,12 @@ template <typename T> boost::multiprecision::uint256_t fromBytes(const T &bytes)
 
 template <bool isSigned> struct Signedness {};
 
-template <> struct Signedness<true> { typedef boost::multiprecision::int256_t Type; };
+template <> struct Signedness<true> { typedef boost::multiprecision::int256_t type; };
 
-template <> struct Signedness<false> { typedef boost::multiprecision::uint256_t Type; };
+template <> struct Signedness<false> { typedef boost::multiprecision::uint256_t type; };
 
-template <bool isSigned = false> Signedness<isSigned>::Type fromString(const std::string &str) {
-    return boost::multiprecision::cpp_int(str).convert_to<typename Signedness<isSigned>::Type>();
+template <bool isSigned = false> Signedness<isSigned>::type fromString(const std::string &str) {
+    return boost::multiprecision::cpp_int(str).convert_to<typename Signedness<isSigned>::type>();
 }
 
 template <size_t N> std::string toString(const std::array<unsigned char, N> &bytes) {
@@ -190,6 +191,7 @@ inline void prettyPrint(std::ostream &os, boost::json::value const &jv, std::str
                     if (++it == arr.end())
                         break;
                     os << ",\n";
+
                 }
             }
             os << "\n";

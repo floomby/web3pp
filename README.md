@@ -8,11 +8,11 @@ This library depends only on some boost libraries and openssl.
 
 ### Near term features
 
+* Abi encoding
 * Stuff to help with contract interactions
 * Event subscriptions/past event searching
 * Monitoring pending and completed transactions
 * Better testing coverage
-* Make utility and encoding work with negative numbers
 
 ### Longer term features
 

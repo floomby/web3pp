@@ -14,6 +14,8 @@ BOOST_AUTO_TEST_CASE(Abi) {
 
     BOOST_CHECK(Web3::toString(Web3::Encoder::ABIEncode(Web3::Address("0xbcc18C958EaE2fd41E21B59Efc626205d8982107"))) == "000000000000000000000000bcc18c958eae2fd41e21b59efc626205d8982107");
 
-    std::array<unsigned char, 3> arr = {0x01, 0x02, 0x03};
-    BOOST_CHECK(Web3::toString(Web3::Encoder::ABIEncode(arr)) == "0102030000000000000000000000000000000000000000000000000000000000");
+    BOOST_CHECK(Web3::toString(Web3::Encoder::ABIEncode(std::array<unsigned char, 3>({0x01, 0x02, 0x03}))) == "0102030000000000000000000000000000000000000000000000000000000000");
+
+    BOOST_CHECK(Web3::toString(Web3::Encoder::ABIEncode(Web3::Fixed<true, 128, 3>({Web3::fromString<true>("-123456789")}))) == "ffffffffffffffffffffffffffffffffffffffffffffffffffffffe34166e5f8");
+    BOOST_CHECK(Web3::toString(Web3::Encoder::ABIEncode(Web3::Fixed<false, 128, 18>({Web3::fromString("123456789")}))) == "000000000000000000000000000000000000000000661efdf12d1653cf340000");
 }

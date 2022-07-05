@@ -18,4 +18,11 @@ BOOST_AUTO_TEST_CASE(Abi) {
 
     BOOST_CHECK(Web3::toString(Web3::Encoder::ABIEncode(Web3::Fixed<true, 128, 3>({Web3::fromString<true>("-123456789")}))) == "ffffffffffffffffffffffffffffffffffffffffffffffffffffffe34166e5f8");
     BOOST_CHECK(Web3::toString(Web3::Encoder::ABIEncode(Web3::Fixed<false, 128, 18>({Web3::fromString("123456789")}))) == "000000000000000000000000000000000000000000661efdf12d1653cf340000");
+
+    BOOST_CHECK(Web3::toString(Web3::Encoder::ABIEncode(Web3::hexToBytes("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"))) == 
+        "00000000000000000000000000000000000000000000000000000000000000280123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef000000000000000000000000000000000000000000000000");
+    BOOST_CHECK(Web3::toString(Web3::Encoder::ABIEncode(Web3::hexToBytes("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"))) == 
+        "00000000000000000000000000000000000000000000000000000000000000200123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+
+    std::cout << Web3::toString(Web3::Encoder::ABIEncode(std::make_tuple(Web3::hexToBytes("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"), true))) << std::endl;
 }

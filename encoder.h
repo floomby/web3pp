@@ -39,8 +39,6 @@ std::string encode(const boost::multiprecision::uint256_t &data) {
     return ss.str();
 }
 
-#define divRoundUp(n, d) (((n) / (d)) + (n % (d) != 0))
-
 // TODO There has to be a better way to do this
 
 struct RLPEncodeInput {

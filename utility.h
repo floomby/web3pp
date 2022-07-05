@@ -11,9 +11,12 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "keccak.h"
+
+#define divRoundUp(n, d) (((n) / (d)) + (n % (d) != 0))
 
 template <class... T> constexpr bool always_false = false;
 
@@ -80,6 +83,14 @@ inline std::string toString(const boost::multiprecision::uint256_t &num) {
     return ss.str();
 }
 
+template <typename T, typename U> std::string toString(const std::pair<T, U> &pair) {
+    return toString(pair.first) + toString(pair.second);
+}
+
+// template <typename T, typename U> std::string toString(std::pair<T, U> pair) {
+//     return toString(pair.first) + toString(pair.second);
+// }
+
 template <typename T> std::vector<T> &unpadFront(std::vector<T> &v) {
     auto it = v.begin();
     while (!v.empty() && v.front() == 0) {
@@ -114,12 +125,13 @@ template <typename T, size_t N> std::vector<T> padBackTo(const std::array<T, N> 
     return padBackTo(std::move(v), n);
 }
 
-template <class T> struct is_std_array : std::is_array<T> {};
+template <class T> struct is_std_tuple : std::false_type {};
+template <class ...Ts> struct is_std_tuple<std::tuple<Ts...>> : std::true_type {};
 
+template <class T> struct is_std_array : std::is_array<T> {};
 template <class T, std::size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
 
 template <class T> struct std_array_size { static_assert(always_false<T>, "Not a std::array"); };
-
 template <typename T, size_t N> struct std_array_size<std::array<T, N>> { static constexpr size_t value = N; };
 
 template <typename T = std::vector<unsigned char>> T hexToBytes(const std::string &hex) {

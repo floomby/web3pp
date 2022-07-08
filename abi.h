@@ -65,8 +65,18 @@ template <typename T, size_t Idx> std::vector<std::pair<bool, std::vector<unsign
     return acm;
 }
 
-// TODO functions, strings (like bytes, but need to utf8 encode them first), T[], T[k], runtime fixed, and runtime bytesN (I also need to think about how enums get handled)
-// I need both compile time strong typed versions and also runtime versions
+inline std::vector<unsigned char> ABIEncode() {
+    return {};
+}
+/**
+ * @brief This function is complicated and not right
+ * 
+ * @tparam T type to encode (note that std::vector<unsigned char> is bytes and not uint8[] likewise std::array<unsigned char, N> is not uint8[N]
+ * but is actually bytesN) I have an idea how to maybe fix this
+ * @param data 
+ * @return std::vector<unsigned char> abiencoded data
+ */
+
 template <typename T>
 std::vector<unsigned char> ABIEncode(const T &data) {
     if constexpr (std::is_same_v<T, boost::multiprecision::uint256_t> || std::is_unsigned_v<T>) {
@@ -77,17 +87,29 @@ std::vector<unsigned char> ABIEncode(const T &data) {
     } else if constexpr (std::is_same_v<T, Address>) {
         return padFrontTo(data.bytes, 32);
     } else if constexpr (is_std_array<T>::value) {
-        // internally we use array<unsigned char, N> to represent bytesN for compile time types
-        static_assert(std_array_size<T>::value <= 32, "bytesN can only have up to 32 bytes");
-        return padBackTo(data, 32);
+        if constexpr (std::is_same_v<unsigned char, typename std_array_type<T>::type>) {
+            // internally we use array<unsigned char, N> to represent bytesN for compile time types
+            static_assert(std_array_size<T>::value <= 32, "bytesN can only have up to 32 bytes");
+            return padBackTo(data, 32);
+        } else {
+            static_assert(always_false<T>, "std::array<T, N> can only have T = unsigned char");
+        }
     } else if constexpr (is_fixed<T>::value) {
         return ABIEncode(data.abiEncodable());
     } else if constexpr (std::is_same_v<T, std::vector<unsigned char>>) {
         auto tmp = data;
         tmp = padBackTo(std::move(tmp), 32 * divRoundUp(data.size(), 32));
-        auto acm = ABIEncode(data.size());
-        acm.insert(acm.end(), tmp.begin(), tmp.end());
-        return acm;
+        auto lenEnc = ABIEncode(data.size());
+        tmp.insert(tmp.begin(), lenEnc.begin(), lenEnc.end());
+        return tmp;
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        std::vector<unsigned char> tmp;
+        tmp.reserve(data.size());
+        std::copy(data.begin(), data.end(), std::back_inserter(tmp));
+        tmp = padBackTo(std::move(tmp), 32 * divRoundUp(data.size(), 32));
+        auto lenEnc = ABIEncode(data.size());
+        tmp.insert(tmp.begin(), lenEnc.begin(), lenEnc.end());
+        return tmp;
     } else if constexpr (is_std_tuple<T>::value) { 
         // TODO I am not sure this is correct
         if constexpr (std::tuple_size_v<T> == 0) return {};

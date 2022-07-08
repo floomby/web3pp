@@ -128,11 +128,14 @@ template <typename T, size_t N> std::vector<T> padBackTo(const std::array<T, N> 
 template <class T> struct is_std_tuple : std::false_type {};
 template <class ...Ts> struct is_std_tuple<std::tuple<Ts...>> : std::true_type {};
 
-template <class T> struct is_std_array : std::is_array<T> {};
+template <class T> struct is_std_array : std::false_type {};
 template <class T, std::size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
 
 template <class T> struct std_array_size { static_assert(always_false<T>, "Not a std::array"); };
-template <typename T, size_t N> struct std_array_size<std::array<T, N>> { static constexpr size_t value = N; };
+template <class T, size_t N> struct std_array_size<std::array<T, N>> { static constexpr size_t value = N; };
+
+template <class T> struct std_array_type { static_assert(always_false<T>, "Not a std::array"); };
+template <class T, size_t N> struct std_array_type<std::array<T, N>> { typedef T type; };
 
 template <typename T = std::vector<unsigned char>> T hexToBytes(const std::string &hex) {
     auto offset = hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X') ? 2 : 0;

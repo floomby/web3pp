@@ -3,6 +3,7 @@
 #include "base.h"
 #include "net.h"
 #include "utility.h"
+#include "transactionHash.h"
 
 namespace Web3 {
 
@@ -19,6 +20,8 @@ class Account {
     bool canSign = false;
 
    public:
+    size_t nonce = 0;
+
     Account() = delete;
     inline explicit Account(const std::string &privateKeyHex, std::shared_ptr<Context> context = defaultContext) : Account(hexToBytes(privateKeyHex), context) {}
 
@@ -99,6 +102,8 @@ class Account {
         std::copy(kec.begin() + 12, kec.end(), address.bytes.begin());
 
         EC_POINT_free(pubKey);
+
+        nonce = getTransactionCount();
     }
     ~Account() {
         if (privateKey) {
@@ -333,7 +338,7 @@ class Account {
 
         return ret;
     }
-    void sendRawTransaction(const std::string &tx) {
+    TransactionHash sendRawTransaction(const std::string &tx) {
         auto str = context->buildRPCJson("eth_sendRawTransaction", "[\"0x" + tx + "\"]");
         boost::json::value results;
         try {
@@ -342,10 +347,23 @@ class Account {
             throw std::runtime_error("Unable to send raw transaction: " + std::string(e.what()));
         }
         if (results.as_object().contains("error")) {
-            std::cout << "Unable to send raw transaction: " << results.at("error").at("message").as_string() << std::endl;
-            return;
+            throw std::runtime_error("Unable to send raw transaction: " + value_to<std::string>(results.at("error").at("message")));
         }
-        std::cout << "TX: " << results.at("result") << std::endl;
+        // std::cout << "TX: " << results.at("result") << std::endl;
+        return {context, value_to<std::string>(results.at("result"))};
+    }
+    size_t getTransactionCount() {
+        auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");
+        boost::json::value results;
+        try {
+            results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
+        } catch (const std::exception &e) {
+            throw std::runtime_error("Unable to get transaction count: " + std::string(e.what()));
+        }
+        if (results.as_object().contains("error")) {
+            throw std::runtime_error("Unable to get transaction count: " + value_to<std::string>(results.at("error").at("message")));
+        }
+        return std::stoul(value_to<std::string>(results.at("result")), nullptr, 16);
     }
 };
 

@@ -26,30 +26,36 @@
 #include "utility.h"
 #include "abi.h"
 
+#include "demo.h"
+
 int main(int argc, char **argv) {
     try {
 
-        std::cout << Web3::toString(Web3::Encoder::ABIEncode(Web3::fromString<true>(argv[1]))) << std::endl;
+        Demo demo;
+        // demo.deploy();
 
-        return EXIT_SUCCESS;
+        // std::cout << Web3::toString(Web3::Encoder::ABIEncode(Web3::fromString<true>(argv[1]))) << std::endl;
 
-        // Web3::defaultContext = std::make_shared<Web3::Context>("127.0.0.1", "7545", 1);
-        Web3::defaultContext = std::make_shared<Web3::Context>("rpc.sepolia.dev", "443", 11155111, true);
+        Web3::defaultContext = std::make_shared<Web3::Context>("127.0.0.1", "7545", 1);
+        // Web3::defaultContext = std::make_shared<Web3::Context>("rpc.sepolia.dev", "443", 11155111, true);
         Web3::defaultContext->run();
 
-        auto account2 = Web3::Account(std::string{"af817fc51a733a9387f135d605106f2a391cd689822cc5721f2d81df9fd64e1d"});
-        std::cout << account2.getAddress() << " - " << account2.getBalance() << std::endl;
+        // auto account2 = Web3::Account(std::string{"af817fc51a733a9387f135d605106f2a391cd689822cc5721f2d81df9fd64e1d"});
+        // std::cout << account2.getAddress() << " - " << account2.getBalance() << std::endl;
 
         Web3::Account account(std::string{"387e50a4fa783cb44d1d579a0810f169e81f5d2e705615c483aa3c208d25f966"});
 
-        Web3::Transaction tx{std::stoul(argv[1]), 0x04a817c800, 0x021000, Web3::hexToBytes("bcc18C958EaE2fd41E21B59Efc626205d8982107"), Web3::fromString("0xDE0B6B3A7640000")};
+        Web3::Transaction tx{account.nonce, 0x04a817c800, 0x021000, Web3::hexToBytes("0000000000000000000000000000000000000000"), Web3::fromString("00"), Web3::hexToBytes(demo.__data())};
+        // Web3::Transaction tx{std::stoul(argv[1]), 0x04a817c800, 0x021000, Web3::hexToBytes("bcc18C958EaE2fd41E21B59Efc626205d8982107"), Web3::fromString("0xDE0B6B3A7640000")};
         auto signedTx = tx.sign(account);
 
         std::cout << "Signed Tx: " << Web3::toString(signedTx) << std::endl;
-        account.sendRawTransaction(Web3::toString(signedTx));
+        auto h = account.sendRawTransaction(Web3::toString(signedTx));
+        std::cout << "Hash: " << h << std::endl;
+        h.getReceipt();
 
-        auto handler = [](const std::string &str){ std::cout << "Completed" << std::endl; };
-        std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(Web3::defaultContext, handler, "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":5777}")->call();
+        // auto handler = [](const std::string &str){ std::cout << "Completed" << std::endl; };
+        // std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(Web3::defaultContext, handler, "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":5777}")->call();
     } catch (...) {
         std::exception_ptr p = std::current_exception();
         std::cout << (p ? p.__cxa_exception_type()->name() : "null") << std::endl;

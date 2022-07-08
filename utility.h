@@ -93,7 +93,7 @@ template <typename T, typename U> std::string toString(const std::pair<T, U> &pa
 
 template <typename T> std::vector<T> &unpadFront(std::vector<T> &v) {
     auto it = v.begin();
-    while (!v.empty() && v.front() == 0) {
+    while (!v.empty() && *it == 0) {
         it++;
     }
     v.erase(v.begin(), it);
@@ -292,9 +292,36 @@ template <> inline std::vector<unsigned char> integralToBytes<bool>(bool val) {
 struct Address {
     std::array<unsigned char, 20> bytes;
     Address(const std::string &hex) : bytes(hexToBytes<std::array<unsigned char, 20>>(hex)) {}
+    Address(const char *hex) : Address(std::string(hex)) {}
     Address() {
         std::fill(bytes.begin(), bytes.end(), 0);
+    }
+    template <typename T>
+    Address(const T &val) {
+        if (val.size() < 20) throw std::runtime_error("Address must be 20 bytes");
+        std::copy_n(val.begin(), 20, bytes.begin());
     }
 };
 
 }  // namespace Web3
+
+template <typename T>
+constexpr auto type_name() {
+    std::string_view name, prefix, suffix;
+#ifdef __clang__
+    name = __PRETTY_FUNCTION__;
+    prefix = "auto type_name() [T = ";
+    suffix = "]";
+#elif defined(__GNUC__)
+    name = __PRETTY_FUNCTION__;
+    prefix = "constexpr auto type_name() [with T = ";
+    suffix = "]";
+#elif defined(_MSC_VER)
+    name = __FUNCSIG__;
+    prefix = "auto __cdecl type_name<";
+    suffix = ">(void)";
+#endif
+    name.remove_prefix(prefix.size());
+    name.remove_suffix(suffix.size());
+    return name;
+}

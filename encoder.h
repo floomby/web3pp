@@ -39,8 +39,7 @@ std::string encode(const boost::multiprecision::uint256_t &data) {
     return ss.str();
 }
 
-// TODO There has to be a better way to do this
-
+// TODO Fix how crappy this is
 struct RLPEncodeInput {
     std::optional<std::vector<unsigned char>> value;
     std::optional<std::vector<RLPEncodeInput>> list;
@@ -48,6 +47,15 @@ struct RLPEncodeInput {
     RLPEncodeInput(std::vector<RLPEncodeInput> &&list) : list(std::move(list)){};
     RLPEncodeInput(const std::vector<unsigned char> &value) : value(value){};
     RLPEncodeInput(const std::vector<RLPEncodeInput> &list) : list(list){};
+    RLPEncodeInput(const Address &val) {
+        value = std::vector<unsigned char>(val.bytes.begin(), val.bytes.end());
+    }
+    // TODO catch all like for abi encoding
+    template <typename T> RLPEncodeInput(const T &val) : value() {
+        static_assert(std::is_integral<T>::value, "T must be integral");
+        value = integralToBytes(val);
+        unpadFront(value.value());
+    }
 };
 
 void RLPEncodeLength(std::vector<unsigned char> &acm, size_t length, unsigned char prefix) {
@@ -62,7 +70,7 @@ void RLPEncodeLength(std::vector<unsigned char> &acm, size_t length, unsigned ch
     }
 }
 
-void RLPEncode(std::vector<unsigned char> &acm, const RLPEncodeInput &data) {
+void RLPEncode_(std::vector<unsigned char> &acm, const RLPEncodeInput &data) {
     if (data.value.has_value()) {
         if (data.value.value().size() == 1) {
             if (data.value.value()[0] == 0) {
@@ -87,7 +95,7 @@ void RLPEncode(std::vector<unsigned char> &acm, const RLPEncodeInput &data) {
         assert(data.list.has_value());
         std::vector<unsigned char> tmp;
         for (auto &item : data.list.value()) {
-            RLPEncode(tmp, item);
+            RLPEncode_(tmp, item);
         }
         if (tmp.size() < 56) {
             acm.push_back(0xC0 + tmp.size());
@@ -102,8 +110,32 @@ void RLPEncode(std::vector<unsigned char> &acm, const RLPEncodeInput &data) {
 
 std::vector<unsigned char> encode(const RLPEncodeInput &data) {
     std::vector<unsigned char> acm;
-    RLPEncode(acm, data);
+    RLPEncode_(acm, data);
     return acm;
+}
+
+template <typename T>
+std::vector<unsigned char> RLPEncode__(RLPEncodeInput &acm, const T &first) {
+    assert(acm.list.has_value());
+    acm.list.value().push_back(RLPEncodeInput(first));
+    return encode(acm);
+}
+
+template <typename T, typename... Rest>
+std::vector<unsigned char> RLPEncode__(RLPEncodeInput &acm, const T &first, const Rest &... rest) {
+    assert(acm.list.has_value());
+    acm.list.value().push_back(RLPEncodeInput(first));
+    return RLPEncode__(acm, rest...);
+}
+
+template <typename... Rest>
+std::vector<unsigned char> RLPEncode(const Rest &... rest) {
+    Web3::Encoder::RLPEncodeInput acm(std::vector<Web3::Encoder::RLPEncodeInput>({}));
+    return RLPEncode__(acm, rest...);
+}
+
+std::vector<unsigned char> RLPEncode() {
+    return {0xc0};
 }
 
 }  // namespace Encoder

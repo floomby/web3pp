@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base.h"
+#include "encoder.h"
 #include "net.h"
 #include "utility.h"
 #include "transactionHash.h"
@@ -364,6 +365,11 @@ class Account {
             throw std::runtime_error("Unable to get transaction count: " + value_to<std::string>(results.at("error").at("message")));
         }
         return std::stoul(value_to<std::string>(results.at("result")), nullptr, 16);
+    }
+    Address deployedContract(size_t nonce) {
+        Encoder::RLPEncodeInput addr{this->address};
+        Encoder::RLPEncodeInput nonce_{nonce};
+        return Address(keccak256(Encoder::RLPEncode(addr, nonce_)));
     }
 };
 

@@ -34,6 +34,7 @@ int main(int argc, char **argv) {
         Demo demo;
         // demo.deploy();
 
+
         // std::cout << Web3::toString(Web3::Encoder::ABIEncode(Web3::fromString<true>(argv[1]))) << std::endl;
 
         Web3::defaultContext = std::make_shared<Web3::Context>("127.0.0.1", "7545", 1);
@@ -45,13 +46,16 @@ int main(int argc, char **argv) {
 
         Web3::Account account(std::string{"387e50a4fa783cb44d1d579a0810f169e81f5d2e705615c483aa3c208d25f966"});
 
-        Web3::Transaction tx{account.nonce, 0x04a817c800, 0x021000, Web3::hexToBytes("0000000000000000000000000000000000000000"), Web3::fromString("00"), Web3::hexToBytes(demo.__data())};
+        // return EXIT_SUCCESS;
+        auto nonce = account.nonce;
+        Web3::Transaction tx{nonce, 0x04a817c800, 0x021000, Web3::hexToBytes("0000000000000000000000000000000000000000"), Web3::fromString("00"), Web3::hexToBytes(demo.__data())};
         // Web3::Transaction tx{std::stoul(argv[1]), 0x04a817c800, 0x021000, Web3::hexToBytes("bcc18C958EaE2fd41E21B59Efc626205d8982107"), Web3::fromString("0xDE0B6B3A7640000")};
         auto signedTx = tx.sign(account);
 
         std::cout << "Signed Tx: " << Web3::toString(signedTx) << std::endl;
         auto h = account.sendRawTransaction(Web3::toString(signedTx));
         std::cout << "Hash: " << h << std::endl;
+        std::cout << "Address should be (assuming I coded correctly): " << Web3::toString(account.deployedContract(nonce).bytes) << std::endl;
         h.getReceipt();
 
         // auto handler = [](const std::string &str){ std::cout << "Completed" << std::endl; };

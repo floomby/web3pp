@@ -22,7 +22,7 @@ BOOST_AUTO_TEST_CASE(Encoder) {
     Web3::Encoder::RLPEncodeInput zero(std::vector<unsigned char>({0x00}));
     BOOST_CHECK(Web3::Encoder::encode(zero) == std::vector<unsigned char>({0x80}));
 
-    Web3::Encoder::RLPEncodeInput input1({0x43, 0x44, 0x45});
+    Web3::Encoder::RLPEncodeInput input1(std::vector<unsigned char>({0x43, 0x44, 0x45}));
     BOOST_CHECK(Web3::Encoder::encode(input1) == std::vector<unsigned char>({0x83, 0x43, 0x44, 0x45}));
 
     Web3::Encoder::RLPEncodeInput input2({emptyString, emptyList, zero});

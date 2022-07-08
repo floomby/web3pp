@@ -34,7 +34,6 @@ int main(int argc, char **argv) {
         Demo demo;
         // demo.deploy();
 
-
         // std::cout << Web3::toString(Web3::Encoder::ABIEncode(Web3::fromString<true>(argv[1]))) << std::endl;
 
         Web3::defaultContext = std::make_shared<Web3::Context>("127.0.0.1", "7545", 1);
@@ -48,15 +47,20 @@ int main(int argc, char **argv) {
 
         // return EXIT_SUCCESS;
         auto nonce = account.nonce;
-        Web3::Transaction tx{nonce, 0x04a817c800, 0x021000, Web3::hexToBytes("0000000000000000000000000000000000000000"), Web3::fromString("00"), Web3::hexToBytes(demo.__data())};
+        // Web3::Transaction tx{nonce, 0x04a817c800, 0x021000, Web3::hexToBytes("0000000000000000000000000000000000000000"), Web3::fromString("00"), Web3::hexToBytes(demo.__data())};
+        Web3::Transaction tx{nonce, 0x04a817c800, 0x0210000, std::vector<unsigned char>({}), Web3::fromString("00"), Web3::hexToBytes(demo.__data())};
         // Web3::Transaction tx{std::stoul(argv[1]), 0x04a817c800, 0x021000, Web3::hexToBytes("bcc18C958EaE2fd41E21B59Efc626205d8982107"), Web3::fromString("0xDE0B6B3A7640000")};
         auto signedTx = tx.sign(account);
 
-        std::cout << "Signed Tx: " << Web3::toString(signedTx) << std::endl;
-        auto h = account.sendRawTransaction(Web3::toString(signedTx));
-        std::cout << "Hash: " << h << std::endl;
-        std::cout << "Address should be (assuming I coded correctly): " << Web3::toString(account.deployedContract(nonce).bytes) << std::endl;
-        h.getReceipt();
+        try {
+            std::cout << "Signed Tx: " << Web3::toString(signedTx) << std::endl;
+            auto h = account.sendRawTransaction(Web3::toString(signedTx));
+            std::cout << "Hash: " << h << std::endl;
+            std::cout << "Address should be (assuming I coded correctly): " << Web3::toString(account.deployedContract(nonce).bytes) << std::endl;
+            h.getReceipt();
+        } catch (std::exception &e) {
+            std::cout << "Error: " << e.what() << std::endl;
+        }
 
         // auto handler = [](const std::string &str){ std::cout << "Completed" << std::endl; };
         // std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(Web3::defaultContext, handler, "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":5777}")->call();

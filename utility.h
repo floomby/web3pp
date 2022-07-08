@@ -298,12 +298,20 @@ struct Address {
     }
     template <typename T>
     Address(const T &val) {
-        if (val.size() < 20) throw std::runtime_error("Address must be 20 bytes");
+        if (val.size() != 20) throw std::runtime_error("Address must be 20 bytes");
         std::copy_n(val.begin(), 20, bytes.begin());
     }
 };
 
 }  // namespace Web3
+
+namespace std {
+ostream &operator<<(ostream &os, const Web3::Address &address) {
+    os << Web3::toString(address.bytes);
+    return os;
+}
+}  // namespace std
+
 
 template <typename T>
 constexpr auto type_name() {

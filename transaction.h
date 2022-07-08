@@ -23,7 +23,7 @@ class Transaction {
         Encoder::RLPEncodeInput chainId(integralToBytes(context ? context->chainId : defaultContext->chainId));
         Encoder::RLPEncodeInput empty(std::vector<unsigned char>({}));
 
-        Encoder::RLPEncodeInput txrlp({ nonce, gasPrice, gasLimit, to, value, empty, chainId, empty, empty });
+        Encoder::RLPEncodeInput txrlp({ nonce, gasPrice, gasLimit, to, value, data, chainId, empty, empty });
         auto txrlpEncoded = Encoder::encode(txrlp);
         auto txrlpHash = keccak256(txrlpEncoded);
         auto sig = account.sign(txrlpHash);
@@ -40,7 +40,7 @@ class Transaction {
         Encoder::RLPEncodeInput rEnc(sig.r);
         Encoder::RLPEncodeInput sEnc(sig.s);
 
-        Encoder::RLPEncodeInput signedTx({ nonce, gasPrice, gasLimit, to, value, empty, vEnc, rEnc, sEnc });
+        Encoder::RLPEncodeInput signedTx({ nonce, gasPrice, gasLimit, to, value, data, vEnc, rEnc, sEnc });
         return Encoder::encode(signedTx);
     }
 };

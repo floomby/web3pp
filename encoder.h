@@ -51,10 +51,8 @@ struct RLPEncodeInput {
         value = std::vector<unsigned char>(val.bytes.begin(), val.bytes.end());
     }
     // TODO catch all like for abi encoding
-    template <typename T> RLPEncodeInput(const T &val) : value() {
+    template <typename T> RLPEncodeInput(const T &val) : value(integralToBytes(val)) {
         static_assert(std::is_integral<T>::value, "T must be integral");
-        value = integralToBytes(val);
-        unpadFront(value.value());
     }
 };
 
@@ -72,7 +70,7 @@ void RLPEncodeLength(std::vector<unsigned char> &acm, size_t length, unsigned ch
 
 void RLPEncode_(std::vector<unsigned char> &acm, const RLPEncodeInput &data) {
     if (data.value.has_value()) {
-        if (data.value.value().size() == 1) {
+        if (data.value->size() == 1) {
             if (data.value.value()[0] == 0) {
                 acm.push_back(0x80);
                 return;
@@ -82,12 +80,12 @@ void RLPEncode_(std::vector<unsigned char> &acm, const RLPEncodeInput &data) {
                 return;
             }
         }
-        if (data.value.value().size() < 56) {
-            acm.push_back(data.value.value().size() + 0x80);
-            std::copy(data.value.value().begin(), data.value.value().end(), std::back_inserter(acm));
-        } else if (data.value.value().size() < 1ULL + std::numeric_limits<unsigned int>::max()) {
-            RLPEncodeLength(acm, data.value.value().size(), 0xB7);
-            std::copy(data.value.value().begin(), data.value.value().end(), std::back_inserter(acm));
+        if (data.value->size() < 56) {
+            acm.push_back(data.value->size() + 0x80);
+            std::copy(data.value->begin(), data.value->end(), std::back_inserter(acm));
+        } else if (data.value->size() < 1ULL + std::numeric_limits<unsigned int>::max()) {
+            RLPEncodeLength(acm, data.value->size(), 0xB7);
+            std::copy(data.value->begin(), data.value->end(), std::back_inserter(acm));
         } else {
             throw std::runtime_error("RLP: string is too large");
         }
@@ -128,10 +126,16 @@ std::vector<unsigned char> RLPEncode__(RLPEncodeInput &acm, const T &first, cons
     return RLPEncode__(acm, rest...);
 }
 
-template <typename... Rest>
-std::vector<unsigned char> RLPEncode(const Rest &... rest) {
+template <typename T, typename... Rest>
+std::vector<unsigned char> RLPEncode(const T &first, const Rest &... rest) {
     Web3::Encoder::RLPEncodeInput acm(std::vector<Web3::Encoder::RLPEncodeInput>({}));
-    return RLPEncode__(acm, rest...);
+    return RLPEncode__(acm, first, rest...);
+}
+
+template <typename T>
+std::vector<unsigned char> RLPEncode(const T &first) {
+    Web3::Encoder::RLPEncodeInput acm(std::vector<Web3::Encoder::RLPEncodeInput>({}));
+    return encode(RLPEncodeInput(first));
 }
 
 std::vector<unsigned char> RLPEncode() {

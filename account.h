@@ -367,9 +367,9 @@ class Account {
         return std::stoul(value_to<std::string>(results.at("result")), nullptr, 16);
     }
     Address deployedContract(size_t nonce) {
-        Encoder::RLPEncodeInput addr{this->address};
-        Encoder::RLPEncodeInput nonce_{nonce};
-        return Address(keccak256(Encoder::RLPEncode(addr, nonce_)));
+        auto tmp = keccak256_v(Encoder::RLPEncode(this->address, nonce));
+        tmp.erase(tmp.begin(), tmp.begin() + 12);
+        return Address(tmp);
     }
 };
 

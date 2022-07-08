@@ -152,3 +152,11 @@ inline std::array<uint8_t, 32> keccak256(const T &_input) {
     hash(output.data(), output.size(), _input.data(), _input.size(), 200 - (256 / 4), 0x01);
     return output;
 }
+
+template <typename T>
+inline std::vector<uint8_t> keccak256_v(const T &_input) {
+    std::vector<uint8_t> output(32);
+    hash(output.data(), output.size(), _input.data(), _input.size(), 200 - (256 / 4), 0x01);
+    return output;
+}
+

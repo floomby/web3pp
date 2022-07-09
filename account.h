@@ -16,17 +16,17 @@ struct Signature {
 
 class Account {
     EC_KEY *privateKey = nullptr;
-    Address address;
     std::shared_ptr<Context> context;
-    bool canSign = false;
 
    public:
+    bool canSign = false;
+    Address address;
     size_t nonce = 0;
 
     Account() = delete;
     inline explicit Account(const std::string &privateKeyHex, std::shared_ptr<Context> context = defaultContext) : Account(hexToBytes(privateKeyHex), context) {}
 
-    explicit Account(Address address, std::shared_ptr<Context> context = defaultContext) : address(address), context(context) {
+    explicit Account(Address address, std::shared_ptr<Context> context = defaultContext) : context(context), address(address) {
         if (!context) {
             throw std::runtime_error("Context must be initalized");
         }
@@ -353,7 +353,8 @@ class Account {
         // std::cout << "TX: " << results.at("result") << std::endl;
         return {context, value_to<std::string>(results.at("result"))};
     }
-    size_t getTransactionCount() {
+    
+    size_t getTransactionCount() const {
         auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");
         boost::json::value results;
         try {
@@ -366,7 +367,7 @@ class Account {
         }
         return std::stoul(value_to<std::string>(results.at("result")), nullptr, 16);
     }
-    Address deployedContract(size_t nonce) {
+    Address deployedContract(size_t nonce) const {
         auto tmp = keccak256_v(Encoder::RLPEncode(this->address, nonce));
         tmp.erase(tmp.begin(), tmp.begin() + 12);
         return Address(tmp);

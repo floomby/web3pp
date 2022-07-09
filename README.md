@@ -4,15 +4,18 @@ Header only Ethereum rpc library for c++.
 
 This library depends only on some boost libraries and openssl.
 
-**Is still very much a work in progress, but currently does sign and send transactions as well as some rpc helpful stuff.**
+**Is still very much a work in progress, but currently does sign and send transactions as well as deploy contracts.**
 
-### Near term features
+### Near term features (In order)
 
-* Abi encoding
-* Stuff to help with contract interactions
+* Contract calls
+* Work on library consistency
+* Documentation
+* Gas estimation
+* Better testing coverage (abi encoding needs some work)
 * Event subscriptions/past event searching
-* Monitoring pending and completed transactions
-* Better testing coverage
+* Improve getting transaction receipts
+* Get pending transactions
 
 ### Longer term features
 

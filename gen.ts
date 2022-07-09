@@ -81,7 +81,7 @@ console.log(
 #include "abi.h"
 #include "contract.h"
 
-class ${className} : public Contract {
+class ${className} : public Web3::Contract {
    public:`);
 
 parsed.filter((x: any) => x.type === "function").forEach((x: any) => {

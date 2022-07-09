@@ -66,12 +66,36 @@ const tuplize = (x: string, count: number) => {
   return x;
 }
 
-const body = (argCount: number, sig: string) => {
+const fm = (x: string) => `    ${x}\n`;
+
+const caller = (tx: boolean, name: string) => {
+  return tx ? `
+    if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
+    const auto nonce = context->signers.front()->getTransactionCount();` : `
+    auto str = context->buildRPCJson("eth_call", "[" + Web3::optionBuilder({
+        {"from", context->signers.front()->address.asString()},
+        {"to", address.asString()},
+        {"data", "0x" + Web3::toString(encoded)}
+    }) + ",\\"latest\\"]");
+    boost::json::value results;
+    try {
+        results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
+    } catch (const std::exception &e) {
+        throw std::runtime_error("Unable to call function (${name}): " + std::string(e.what()));
+    }
+    if (results.as_object().contains("error")) {
+        throw std::runtime_error("Unable to call function (${name}): " + value_to<std::string>(results.at("error").at("message")));
+    }
+    std::cout << "Returned: " << results.at("result") << std::endl;`
+}
+
+const body = (argCount: number, sig: string, tx: boolean) => {
+  const callable = `if (address.isZero()) throw std::runtime_error("Contract must have an address");`;
   const h = keccak256(sig).toString('hex');
   const sel = `std::vector<unsigned char> selector{0x${h.substring(0,2)}, 0x${h.substring(2,4)}, 0x${h.substring(4,6)}, 0x${h.substring(6,8)}};`;
   const encoded = `auto encoded = Web3::Encoder::ABIEncode(${tuplize(Array(argCount).fill(1).map((v:number, idx:number) => `arg${idx}`).join(", "), argCount)});`;
   const append = `encoded.insert(encoded.begin(), selector.begin(), selector.end());`;
-  return `{\n    ${sel}\n    ${encoded}\n    ${append}\n}`;
+  return `{\n${fm(callable)}${fm(sel)}${fm(encoded)}${fm(append)}${caller(tx, sig.split('(')[0])}\n}`;
 };
 
 const className = ((x:string) => x.charAt(0).toUpperCase() + x.slice(1))(process.argv[2].split(".")[0]);
@@ -82,14 +106,17 @@ console.log(
 #include "contract.h"
 
 class ${className} : public Web3::Contract {
-   public:`);
+   public:
+    ${className}(std::shared_ptr<Web3::Context> context = Web3::defaultContext) : Contract(context) {};
+    ${className}(const Web3::Address &address, std::shared_ptr<Web3::Context> context = Web3::defaultContext) : Contract(address, context) {}
+    ${className}(Web3::Address &&address, std::shared_ptr<Web3::Context> context = Web3::defaultContext) : Contract(std::move(address), context) {}`);
 
 parsed.filter((x: any) => x.type === "function").forEach((x: any) => {
   const name = x.name;
   const inputs = x.inputs.map((y: any) => y.type);
   const outputs = x.outputs.map((y: any) => y.type);
   const signature = `${name}(${inputs.join(",")})`;
-  const builder = indent(`inline ${retTypeComposite(outputs)} ${name}(${argTypes(inputs)}) ${body(inputs.length, signature)}`);
+  const builder = indent(`inline ${retTypeComposite(outputs)} ${name}(${argTypes(inputs)}) ${body(inputs.length, signature, false)}`);
   console.log(builder);
 });
 

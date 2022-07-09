@@ -312,6 +312,17 @@ struct Address {
     }
 };
 
+std::string optionBuilder(std::vector<std::pair<std::string, std::string>> options) {
+    std::stringstream ret;
+    ret << "{";
+    for (auto &[key, value] : options) {
+        ret << "\"" << key << "\":\"" << value << "\",";
+    }
+    ret.seekp(-1, std::ios_base::end);
+    ret << "}";
+    return ret.str();
+}
+
 }  // namespace Web3
 
 namespace std {

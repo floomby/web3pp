@@ -43,9 +43,11 @@ int main(int argc, char **argv) {
         Web3::defaultContext->setPrimarySigner(account);
         try {
             demo.deploy();
+            demo.decimals();
         } catch (std::exception &e) {
             std::cout << "Error: " << e.what() << std::endl;
         }
+
 
         // return EXIT_SUCCESS;
         // auto nonce = account.nonce;

@@ -11,7 +11,6 @@ This library depends only on some boost libraries and openssl.
 * Contract calls
 * Work on library consistency
 * Documentation
-* Gas estimation
 * Better testing coverage (abi encoding needs some work)
 * Event subscriptions/past event searching
 * Improve getting transaction receipts

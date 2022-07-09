@@ -30,22 +30,19 @@
 
 int main(int argc, char **argv) {
     try {
-
-        Demo demo;
-        // demo.deploy();
-
-        // std::cout << Web3::toString(Web3::Encoder::ABIEncode(Web3::fromString<true>(argv[1]))) << std::endl;
-
         Web3::defaultContext = std::make_shared<Web3::Context>("127.0.0.1", "7545", 1);
         // Web3::defaultContext = std::make_shared<Web3::Context>("rpc.sepolia.dev", "443", 11155111, true);
         Web3::defaultContext->run();
 
+        Demo demo;
+
         auto account2 = Web3::Account(std::string{"af817fc51a733a9387f135d605106f2a391cd689822cc5721f2d81df9fd64e1d"});
         // std::cout << account2.getAddress() << " - " << account2.getBalance() << std::endl;
 
-        Web3::Account account(std::string{"387e50a4fa783cb44d1d579a0810f169e81f5d2e705615c483aa3c208d25f966"});
+        auto account = std::make_shared<Web3::Account>(std::string{"387e50a4fa783cb44d1d579a0810f169e81f5d2e705615c483aa3c208d25f966"});
+        Web3::defaultContext->setPrimarySigner(account);
         try {
-            demo.deploy(account);
+            demo.deploy();
         } catch (std::exception &e) {
             std::cout << "Error: " << e.what() << std::endl;
         }

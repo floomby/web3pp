@@ -301,6 +301,15 @@ struct Address {
         if (val.size() != 20) throw std::runtime_error("Address must be 20 bytes");
         std::copy_n(val.begin(), 20, bytes.begin());
     }
+    bool operator==(const Address &other) const {
+        return bytes == other.bytes;
+    }
+    bool isZero() const {
+        return std::all_of(bytes.begin(), bytes.end(), [](unsigned char b) { return b == 0; });
+    }
+    std::string asString() const {
+        return "0x" + Web3::toString(bytes);
+    }
 };
 
 }  // namespace Web3

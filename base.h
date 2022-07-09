@@ -39,6 +39,8 @@ void add_windows_root_certs(boost::asio::ssl::context &ctx) {
 
 namespace Web3 {
 
+class Account;
+
 struct Context {
     std::string host, port;
     unsigned chainId;
@@ -53,6 +55,7 @@ struct Context {
         BIGNUM *pMinusN = NULL;
     } crypto;
     std::thread runnerThread;
+    std::list<std::shared_ptr<Account>> signers;
     inline explicit Context(std::string host, std::string port, unsigned chainId, bool useSsl = false)
         : host(host), port(port), chainId(chainId), ioContext(), resolver(ioContext), endpoints(resolver.resolve(host, port)), sslContext(boost::asio::ssl::context::tlsv12_client), useSsl(useSsl) {
         crypto.group = EC_GROUP_new_by_curve_name(NID_secp256k1);
@@ -98,6 +101,9 @@ struct Context {
         if (crypto.group) EC_GROUP_free(crypto.group);
         if (crypto.pMinusN) BN_free(crypto.pMinusN);
         runnerThread.join();
+    }
+    void setPrimarySigner(std::shared_ptr<Account> account) {
+        signers.push_front(account);
     }
 };
 

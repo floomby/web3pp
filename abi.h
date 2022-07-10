@@ -191,9 +191,16 @@ std::vector<unsigned char> ABIEncode(const T &data) {
     }
 }
 
-// template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data) {
-
-// }
+template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data) {
+    if (data.size() % 32 != 0) {
+        throw std::runtime_error("Invalid decode data size");
+    }
+    if constexpr (std::is_same_v<T, boost::multiprecision::uint256_t>) {
+        return fromBytes(data.begin());
+    } else {
+        static_assert(always_false<T>, "Unsupported type");
+    }
+}
 
 }  // namespace Encoder
 

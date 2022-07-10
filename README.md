@@ -8,9 +8,10 @@ This library depends only on some boost libraries and openssl.
 
 ### Near term features (In order)
 
-* Contract calls
+* Abi decoding of returns from contracts
 * Support async calls
-* Call options (value, gas override, gas price)
+* Call options (value, gas override, gas price, alternative signer)
+* Come up with a good way to map solidity structs into c++ objects
 * Work on library consistency
 * Documentation
 * Better testing coverage (abi encoding needs some work)

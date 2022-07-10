@@ -7,6 +7,8 @@
 #include <cstring>
 #include <vector>
 
+namespace Web3 {
+
 /** libkeccak-tiny
  *
  * A single-file implementation of SHA-3 and SHAKE.
@@ -167,4 +169,6 @@ inline U keccak256(const T &_input) {
 
 template <typename T> inline std::vector<unsigned char> keccak256_v(const T &_input) {
     return keccak256<T, std::vector<unsigned char>>(_input);
+}
+
 }

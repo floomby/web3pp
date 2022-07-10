@@ -94,7 +94,8 @@ const caller = (tx: boolean, name: string) => {
     if (results.as_object().contains("error")) {
         throw std::runtime_error("Unable to call function (${name}): " + value_to<std::string>(results.at("error").at("message")));
     }
-    std::cout << "Returned: " << results.at("result") << std::endl;`
+    std::cout << "Returned: " << results.at("result") << std::endl;
+    auto bytes = hexToBytes(value_to<std::string>(results.at("result")));`
 }
 
 const body = (argCount: number, sig: string, tx: boolean) => {
@@ -109,7 +110,8 @@ const body = (argCount: number, sig: string, tx: boolean) => {
 const className = ((x:string) => x.charAt(0).toUpperCase() + x.slice(1))(process.argv[2].split(".")[0]);
 
 console.log(
-`#pragma once
+`// This is an auto-generated file.
+#pragma once
 #include "abi.h"
 #include "contract.h"
 

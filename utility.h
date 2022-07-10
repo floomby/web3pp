@@ -22,6 +22,10 @@ template <class... T> constexpr bool always_false = false;
 
 namespace Web3 {
 
+template <bool isSigned> struct Signedness {};
+template <> struct Signedness<true> { typedef boost::multiprecision::int256_t type; };
+template <> struct Signedness<false> { typedef boost::multiprecision::uint256_t type; };
+
 template <size_t N> std::array<unsigned char, N> randomBytes() {
     boost::random::random_device rd;
     std::array<unsigned char, N> tmp;
@@ -29,33 +33,35 @@ template <size_t N> std::array<unsigned char, N> randomBytes() {
     return tmp;
 }
 
-inline boost::multiprecision::uint256_t fromBytes(const std::vector<unsigned char> &bytes) {
-    boost::multiprecision::uint256_t ret;
+template <bool isSigned = false>
+inline auto fromBytes(const std::vector<unsigned char> &bytes) {
+    typename Signedness<isSigned>::type ret;
     boost::multiprecision::import_bits(ret, bytes.data(), bytes.data() + bytes.size(), 0, true);
     return ret;
 }
 
-template <size_t N> boost::multiprecision::uint256_t fromBytes(const std::array<unsigned char, N> &bytes) {
+template <bool isSigned = false>
+inline auto fromBytes(const std::vector<unsigned char>::const_iterator &begin, size_t size = 32) {
+    typename Signedness<isSigned>::type ret;
+    boost::multiprecision::import_bits(ret, begin, begin + size, 0, true);
+    return ret;
+}
+
+template <size_t N, bool isSigned = false> auto fromBytes(const std::array<unsigned char, N> &bytes) {
     static_assert(N == 32, "Only 32 bytes are supported");
-    boost::multiprecision::uint256_t ret;
+    typename Signedness<isSigned>::type ret;
     boost::multiprecision::import_bits(ret, bytes.data(), bytes.data() + bytes.size(), 0, true);
     return ret;
 }
 
-template <typename T> boost::multiprecision::uint256_t fromBytes(const T &bytes) {
+template <typename T, bool isSigned = false> auto fromBytes(const T &bytes) {
     if (bytes.size() > 32) {
         throw std::runtime_error("Up to 32 bytes are supported");
     }
-    boost::multiprecision::uint256_t ret;
+    typename Signedness<isSigned>::type ret;
     boost::multiprecision::import_bits(ret, bytes.data(), bytes.data() + bytes.size(), 0, true);
     return ret;
 }
-
-template <bool isSigned> struct Signedness {};
-
-template <> struct Signedness<true> { typedef boost::multiprecision::int256_t type; };
-
-template <> struct Signedness<false> { typedef boost::multiprecision::uint256_t type; };
 
 template <bool isSigned = false> Signedness<isSigned>::type fromString(const std::string &str) {
     return boost::multiprecision::cpp_int(str).convert_to<typename Signedness<isSigned>::type>();
@@ -79,7 +85,13 @@ inline std::string toString(const std::vector<unsigned char> &bytes) {
 
 inline std::string toString(const boost::multiprecision::uint256_t &num) {
     std::stringstream ss;
-    ss << std::hex << std::setw(64) << std::setfill('0') << std::showbase << num;
+    ss << std::hex << std::setfill('0') << std::showbase << num;
+    return ss.str();
+}
+
+inline std::string toString(const boost::multiprecision::int256_t &num) {
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0') << std::showbase << num;
     return ss.str();
 }
 

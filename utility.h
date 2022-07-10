@@ -137,6 +137,9 @@ template <class T, size_t N> struct std_array_size<std::array<T, N>> { static co
 template <class T> struct std_array_type { static_assert(always_false<T>, "Not a std::array"); };
 template <class T, size_t N> struct std_array_type<std::array<T, N>> { typedef T type; };
 
+template <class T> struct std_vector_type { static_assert(always_false<T>, "Not a std::vector"); };
+template <class T> struct std_vector_type<std::vector<T>> { typedef T type; };
+
 template <typename T = std::vector<unsigned char>> T hexToBytes(const std::string &hex) {
     auto offset = hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X') ? 2 : 0;
     T bytes;
@@ -335,7 +338,7 @@ struct Function {
     }
 };
 
-std::string optionBuilder(std::vector<std::pair<std::string, std::string>> options) {
+inline std::string optionBuilder(std::vector<std::pair<std::string, std::string>> options) {
     std::stringstream ret;
     ret << "{";
     for (auto &[key, value] : options) {
@@ -349,7 +352,7 @@ std::string optionBuilder(std::vector<std::pair<std::string, std::string>> optio
 }  // namespace Web3
 
 namespace std {
-ostream &operator<<(ostream &os, const Web3::Address &address) {
+inline ostream &operator<<(ostream &os, const Web3::Address &address) {
     os << Web3::toString(address.bytes);
     return os;
 }

@@ -2,6 +2,7 @@
 
 #include <string_view>
 #include <type_traits>
+#include <list>
 
 #include "utility.h"
 
@@ -26,10 +27,41 @@ struct is_fixed<Fixed<isSigned, M, N>> : std::true_type {};
 
 namespace Encoder {
 
+template <typename T, size_t Idx>
+bool constexpr is_dynamic_t();
+
 template <typename T>
 bool constexpr is_dynamic() {
     using t = std::remove_cv_t<std::remove_reference_t<T>>;
-    return std::is_same_v<t, std::vector<unsigned char>>;
+    if (is_std_vector<t>::value || std::is_same_v<t, std::string>) {
+        return true;
+    }
+    if constexpr (is_std_tuple<t>::value) {
+        return is_dynamic_t<t, std::tuple_size_v<T> - 1>();
+    }
+    return false;
+}
+
+template <size_t N, typename... Ts>
+struct get_tuple_type;
+
+template <size_t N, typename T, typename... Ts>
+struct get_tuple_type<N, std::tuple<T, Ts...>> {
+    using type = typename get_tuple_type<N - 1, std::tuple<Ts...>>::type;
+};
+
+template <typename T, typename... Ts>
+struct get_tuple_type<0, std::tuple<T, Ts...>> {
+    using type = T;
+};
+
+template <typename T, size_t Idx>
+bool constexpr is_dynamic_t() {
+    static_assert(is_std_tuple<T>::value, "T must be a std::tuple");
+    if (Idx == 0) {
+        return false;
+    }
+    return is_dynamic<get_tuple_type<Idx, T>::type>() || is_dynamic_t<T, Idx - 1>();
 }
 
 template <typename T>
@@ -68,14 +100,20 @@ std::vector<unsigned char> ABIEncode(const T &data) {
     // Address type
     } else if constexpr (std::is_same_v<T, Address>) {
         return padFrontTo(data.bytes, 32);
-    // BytesN types
     } else if constexpr (is_std_array<T>::value) {
+        // BytesN types
         if constexpr (std::is_same_v<unsigned char, typename std_array_type<T>::type>) {
             // internally we use array<unsigned char, N> to represent bytesN for compile time types
             static_assert(std_array_size<T>::value <= 32, "bytesN can only have up to 32 bytes");
             return padBackTo(data, 32);
+        // Type[N] type
         } else {
-            static_assert(always_false<T>, "std::array<T, N> can only have T = unsigned char");
+            std::vector<unsigned char> acm;
+            for (int i = 0; i < std_array_size<T>::value; i++) {
+                auto res = ABIEncode(data[i]);
+                acm.insert(acm.end(), res.begin(), res.end());
+            }
+            return acm;
         }
     // All fixed types
     } else if constexpr (is_fixed<T>::value) {
@@ -87,6 +125,32 @@ std::vector<unsigned char> ABIEncode(const T &data) {
         auto lenEnc = ABIEncode(data.size());
         tmp.insert(tmp.begin(), lenEnc.begin(), lenEnc.end());
         return tmp;
+    // Type[] Type
+    } else if constexpr (is_std_vector<T>::value) {
+        if (data.size() == 0) {
+            return ABIEncode(0);
+        }
+        std::list<std::vector<unsigned char>> acm;
+        for (const auto &item : data) {
+            acm.push_back({ ABIEncode(item) });
+        }
+        size_t dynSize = 0;
+        std::vector<unsigned char> acm2, tails;
+        for (const auto &val : acm) {
+            if constexpr (is_dynamic<typename std_vector_type<T>::type>()) {
+                auto offset = dynSize + data.size() * 32;
+                auto offsetEnc = ABIEncode(offset);
+                acm2.insert(acm2.end(), offsetEnc.begin(), offsetEnc.end());
+                dynSize += val.size();
+                tails.insert(tails.end(), val.begin(), val.end());
+            } else {
+                acm2.insert(acm2.end(), val.begin(), val.end());
+            }
+        }
+        auto sizeEnc = ABIEncode(data.size());
+        acm2.insert(acm2.begin(), sizeEnc.begin(), sizeEnc.end());
+        acm2.insert(acm2.end(), tails.begin(), tails.end());
+        return acm2;
     // string type
     } else if constexpr (std::is_same_v<T, std::string>) {
         std::vector<unsigned char> tmp;

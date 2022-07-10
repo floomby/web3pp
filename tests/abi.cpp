@@ -24,5 +24,7 @@ BOOST_AUTO_TEST_CASE(Abi) {
     BOOST_CHECK(Web3::toString(Web3::Encoder::ABIEncode(Web3::hexToBytes("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"))) == 
         "00000000000000000000000000000000000000000000000000000000000000200123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
+    // TODO make sure this is correct
     // std::cout << Web3::toString(Web3::Encoder::ABIEncode(std::make_tuple(Web3::hexToBytes("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"), true))) << std::endl;
+    std::cout << Web3::toString(Web3::Encoder::ABIEncode(std::vector<int>({1, 2, 3}))) << std::endl;
 }

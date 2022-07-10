@@ -67,11 +67,11 @@ bool constexpr is_dynamic_t() {
 template <typename T>
 std::vector<unsigned char> ABIEncode(const T &data);
 
-template <typename T, size_t Idx> std::vector<std::pair<bool, std::vector<unsigned char>>> &applier(std::vector<std::pair<bool, std::vector<unsigned char>>> &acm, const T &t) {
-    auto res = ABIEncode(get<Idx>(t));
-    acm.push_back({ is_dynamic<decltype(get<Idx>(t))>(), res });
+template <typename T, size_t Idx, size_t N> std::vector<std::pair<bool, std::vector<unsigned char>>> &applier(std::vector<std::pair<bool, std::vector<unsigned char>>> &acm, const T &t) {
+    auto res = ABIEncode(get<N - Idx>(t));
+    acm.push_back({ is_dynamic<decltype(get<N - Idx>(t))>(), res });
     if constexpr (Idx > 0) {
-        return applier<T, Idx - 1>(acm, t);
+        return applier<T, Idx - 1, N>(acm, t);
     }
     return acm;
 }
@@ -165,7 +165,7 @@ std::vector<unsigned char> ABIEncode(const T &data) {
         // TODO I am not sure this is correct
         if constexpr (std::tuple_size_v<T> == 0) return {};
         std::vector<std::pair<bool, std::vector<unsigned char>>> acm;
-        applier<T, std::tuple_size_v<T> - 1>(acm, data);
+        applier<T, std::tuple_size_v<T> - 1, std::tuple_size_v<T> - 1>(acm, data);
         size_t dynSize = 0;
         std::vector<unsigned char> acm2, tails;
         for (auto &[dyn, val] : acm) {

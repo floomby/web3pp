@@ -142,21 +142,29 @@ mkapply_ds(xorin, dst[i] ^= src[i])      // xorin
     memset(a, 0, 200);
 }
 
-template <typename T>
-inline std::array<uint8_t, 32> keccak256(const T &_input) {
-    std::array<uint8_t, 32> output;
+template <class T> struct is_std_vector : std::false_type {};
+template <class T> struct is_std_vector<std::vector<T>> : std::true_type {};
+
+template <typename T, typename U = std::array<uint8_t, 32>>
+inline U keccak256(const T &_input) {
+    U output;
+    
+    if constexpr (is_std_vector<U>::value) {
+        output.resize(32);
+    }
+
     // Parameters used:
     // The 0x01 is the specific padding for keccak (sha3 uses 0x06) and
     // the way the round size (or window or whatever it was) is calculated.
     // 200 - (256 / 4) is the "rate"
-    hash(output.data(), output.size(), _input.data(), _input.size(), 200 - (256 / 4), 0x01);
+    if constexpr (std::is_same_v<decltype(_input.data()), const char *>) {
+        hash(output.data(), output.size(), reinterpret_cast<const uint8_t *>(_input.data()), _input.size(), 200 - (256 / 4), 0x01);
+    } else {
+        hash(output.data(), output.size(), _input.data(), _input.size(), 200 - (256 / 4), 0x01);
+    }
     return output;
 }
 
-template <typename T>
-inline std::vector<uint8_t> keccak256_v(const T &_input) {
-    std::vector<uint8_t> output(32);
-    hash(output.data(), output.size(), _input.data(), _input.size(), 200 - (256 / 4), 0x01);
-    return output;
+template <typename T> inline std::vector<unsigned char> keccak256_v(const T &_input) {
+    return keccak256<T, std::vector<unsigned char>>(_input);
 }
-

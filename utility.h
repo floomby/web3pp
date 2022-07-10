@@ -310,6 +310,29 @@ struct Address {
     std::string asString() const {
         return "0x" + Web3::toString(bytes);
     }
+    std::vector<unsigned char> asVector() const {
+        std::vector<unsigned char> ret(bytes.begin(), bytes.end());
+        return ret;
+    }
+};
+
+struct Selector {
+    std::array<unsigned char, 4> bytes;
+    Selector(const std::string &signature) {
+        auto hash = keccak256(signature);
+        std::copy_n(hash.begin(), 4, bytes.begin());
+    }
+};
+
+struct Function {
+    Address address;
+    Selector selector;
+    std::vector<unsigned char> asVector() const {
+        std::vector<unsigned char> ret;
+        ret.insert(ret.end(), address.bytes.begin(), address.bytes.end());
+        ret.insert(ret.end(), selector.bytes.begin(), selector.bytes.end());
+        return ret;
+    }
 };
 
 std::string optionBuilder(std::vector<std::pair<std::string, std::string>> options) {

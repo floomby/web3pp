@@ -9,6 +9,8 @@ This library depends only on some boost libraries and openssl.
 ### Near term features (In order)
 
 * Contract calls
+* Support async calls
+* Call options (value, gas override, gas price)
 * Work on library consistency
 * Documentation
 * Better testing coverage (abi encoding needs some work)

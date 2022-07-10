@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
         try {
             demo.deploy();
             demo.decimals();
+            demo.approve(Web3::Address{"0xE9F1ad5781ae7421F07F01005ecDD8327d122136"}, Web3::fromString("1000000000000"));
         } catch (std::exception &e) {
             std::cout << "Error: " << e.what() << std::endl;
         }

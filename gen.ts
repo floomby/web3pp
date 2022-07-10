@@ -71,7 +71,15 @@ const fm = (x: string) => `    ${x}\n`;
 const caller = (tx: boolean, name: string) => {
   return tx ? `
     if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
-    const auto nonce = context->signers.front()->getTransactionCount();` : `
+    const auto nonce = context->signers.front()->getTransactionCount();
+    auto gas = estimateGas(context->signers.front()->address, "0", Web3::toString(encoded).c_str(), address);
+    boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
+    Web3::Transaction tx{nonce, 0x04a817c800, gasF.convert_to<boost::multiprecision::uint256_t>(), address.asVector(), Web3::fromString("00"), encoded};
+    auto signedTx = tx.sign(*context->signers.front());
+    auto h = context->signers.front()->sendRawTransaction(Web3::toString(signedTx));
+    std::cout << "Hash: " << h << std::endl;
+    address = context->signers.front()->deployedContract(nonce);
+    h.getReceipt();` : `
     auto str = context->buildRPCJson("eth_call", "[" + Web3::optionBuilder({
         {"from", context->signers.front()->address.asString()},
         {"to", address.asString()},
@@ -115,8 +123,9 @@ parsed.filter((x: any) => x.type === "function").forEach((x: any) => {
   const name = x.name;
   const inputs = x.inputs.map((y: any) => y.type);
   const outputs = x.outputs.map((y: any) => y.type);
+  const mut = x.stateMutability;
   const signature = `${name}(${inputs.join(",")})`;
-  const builder = indent(`inline ${retTypeComposite(outputs)} ${name}(${argTypes(inputs)}) ${body(inputs.length, signature, false)}`);
+  const builder = indent(`inline ${retTypeComposite(outputs)} ${name}(${argTypes(inputs)}) ${body(inputs.length, signature, mut == "payable" || mut == "nonpayable")}`);
   console.log(builder);
 });
 

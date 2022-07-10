@@ -48,7 +48,7 @@ inline std::vector<unsigned char> ABIEncode() {
     return {};
 }
 /**
- * @brief This function is complicated and not right
+ * @brief This function is complicated and incomplete
  * 
  * @tparam T type to encode (note that std::vector<unsigned char> is bytes and not uint8[] likewise std::array<unsigned char, N> is not uint8[N]
  * but is actually bytesN) I have an idea how to maybe fix this
@@ -58,13 +58,17 @@ inline std::vector<unsigned char> ABIEncode() {
 
 template <typename T>
 std::vector<unsigned char> ABIEncode(const T &data) {
+    // All uint types (includes bool)
     if constexpr (std::is_same_v<T, boost::multiprecision::uint256_t> || std::is_unsigned_v<T>) {
         return padFrontTo(integralToBytes(data), 32);
+    // All int types
     } else if constexpr (std::is_same_v<T, boost::multiprecision::int256_t> || std::is_signed_v<T>) {
         // Need to sign extend signed numbers
         return padFrontTo(integralToBytes(data), 32, true);
+    // Address type
     } else if constexpr (std::is_same_v<T, Address>) {
         return padFrontTo(data.bytes, 32);
+    // BytesN types
     } else if constexpr (is_std_array<T>::value) {
         if constexpr (std::is_same_v<unsigned char, typename std_array_type<T>::type>) {
             // internally we use array<unsigned char, N> to represent bytesN for compile time types
@@ -73,14 +77,17 @@ std::vector<unsigned char> ABIEncode(const T &data) {
         } else {
             static_assert(always_false<T>, "std::array<T, N> can only have T = unsigned char");
         }
+    // All fixed types
     } else if constexpr (is_fixed<T>::value) {
         return ABIEncode(data.abiEncodable());
+    // bytes type
     } else if constexpr (std::is_same_v<T, std::vector<unsigned char>>) {
         auto tmp = data;
         tmp = padBackTo(std::move(tmp), 32 * divRoundUp(data.size(), 32));
         auto lenEnc = ABIEncode(data.size());
         tmp.insert(tmp.begin(), lenEnc.begin(), lenEnc.end());
         return tmp;
+    // string type
     } else if constexpr (std::is_same_v<T, std::string>) {
         std::vector<unsigned char> tmp;
         tmp.reserve(data.size());
@@ -89,6 +96,7 @@ std::vector<unsigned char> ABIEncode(const T &data) {
         auto lenEnc = ABIEncode(data.size());
         tmp.insert(tmp.begin(), lenEnc.begin(), lenEnc.end());
         return tmp;
+    // tuple type
     } else if constexpr (is_std_tuple<T>::value) { 
         // TODO I am not sure this is correct
         if constexpr (std::tuple_size_v<T> == 0) return {};
@@ -111,10 +119,17 @@ std::vector<unsigned char> ABIEncode(const T &data) {
         // acm2.insert(acm2.begin(), dynSizeEnc.begin(), dynSizeEnc.end());
         acm2.insert(acm2.end(), tails.begin(), tails.end());
         return acm2;
+    } else if constexpr (std::is_same_v<T, Function>) { 
+        auto ret = data.asVector();
+        return padBackTo(std::move(ret), 32);
     } else {
         static_assert(always_false<T>, "Unsupported type");
     }
 }
+
+// template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data) {
+
+// }
 
 }  // namespace Encoder
 

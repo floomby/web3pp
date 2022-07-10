@@ -7,8 +7,8 @@
 
 namespace Web3 {
 class Contract {
-    const boost::multiprecision::cpp_dec_float_50 gasMult = boost::multiprecision::cpp_dec_float_50(1.2);
    protected:
+    const boost::multiprecision::cpp_dec_float_50 gasMult = boost::multiprecision::cpp_dec_float_50(1.2);
     std::shared_ptr<Context> context;
 
    public:

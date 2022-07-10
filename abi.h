@@ -65,10 +65,10 @@ bool constexpr is_dynamic_t() {
 }
 
 template <typename T>
-std::vector<unsigned char> ABIEncode(const T &data);
+std::vector<unsigned char> ABIEncode_(const T &data);
 
 template <typename T, size_t Idx, size_t N> std::vector<std::pair<bool, std::vector<unsigned char>>> &applier(std::vector<std::pair<bool, std::vector<unsigned char>>> &acm, const T &t) {
-    auto res = ABIEncode(get<N - Idx>(t));
+    auto res = ABIEncode_(get<N - Idx>(t));
     acm.push_back({ is_dynamic<decltype(get<N - Idx>(t))>(), res });
     if constexpr (Idx > 0) {
         return applier<T, Idx - 1, N>(acm, t);
@@ -76,11 +76,12 @@ template <typename T, size_t Idx, size_t N> std::vector<std::pair<bool, std::vec
     return acm;
 }
 
-inline std::vector<unsigned char> ABIEncode() {
-    return {};
-}
+// inline std::vector<unsigned char> ABIEncode_() {
+//     return {};
+// }
+
 /**
- * @brief This function is complicated and incomplete
+ * @brief ABIEncode_ elements
  * 
  * @tparam T type to encode (note that std::vector<unsigned char> is bytes and not uint8[] likewise std::array<unsigned char, N> is not uint8[N]
  * but is actually bytesN) I have an idea how to maybe fix this
@@ -89,7 +90,7 @@ inline std::vector<unsigned char> ABIEncode() {
  */
 
 template <typename T>
-std::vector<unsigned char> ABIEncode(const T &data) {
+std::vector<unsigned char> ABIEncode_(const T &data) {
     // All uint types (includes bool)
     if constexpr (std::is_same_v<T, boost::multiprecision::uint256_t> || std::is_unsigned_v<T>) {
         return padFrontTo(integralToBytes(data), 32);
@@ -110,36 +111,36 @@ std::vector<unsigned char> ABIEncode(const T &data) {
         } else {
             std::vector<unsigned char> acm;
             for (int i = 0; i < std_array_size<T>::value; i++) {
-                auto res = ABIEncode(data[i]);
+                auto res = ABIEncode_(data[i]);
                 acm.insert(acm.end(), res.begin(), res.end());
             }
             return acm;
         }
     // All fixed types
     } else if constexpr (is_fixed<T>::value) {
-        return ABIEncode(data.abiEncodable());
+        return ABIEncode_(data.abiEncodable());
     // bytes type
     } else if constexpr (std::is_same_v<T, std::vector<unsigned char>>) {
         auto tmp = data;
         tmp = padBackTo(std::move(tmp), 32 * divRoundUp(data.size(), 32));
-        auto lenEnc = ABIEncode(data.size());
+        auto lenEnc = ABIEncode_(data.size());
         tmp.insert(tmp.begin(), lenEnc.begin(), lenEnc.end());
         return tmp;
     // Type[] Type
     } else if constexpr (is_std_vector<T>::value) {
         if (data.size() == 0) {
-            return ABIEncode(0);
+            return ABIEncode_(0);
         }
         std::list<std::vector<unsigned char>> acm;
         for (const auto &item : data) {
-            acm.push_back({ ABIEncode(item) });
+            acm.push_back({ ABIEncode_(item) });
         }
         size_t dynSize = 0;
         std::vector<unsigned char> acm2, tails;
         for (const auto &val : acm) {
             if constexpr (is_dynamic<typename std_vector_type<T>::type>()) {
                 auto offset = dynSize + data.size() * 32;
-                auto offsetEnc = ABIEncode(offset);
+                auto offsetEnc = ABIEncode_(offset);
                 acm2.insert(acm2.end(), offsetEnc.begin(), offsetEnc.end());
                 dynSize += val.size();
                 tails.insert(tails.end(), val.begin(), val.end());
@@ -147,7 +148,7 @@ std::vector<unsigned char> ABIEncode(const T &data) {
                 acm2.insert(acm2.end(), val.begin(), val.end());
             }
         }
-        auto sizeEnc = ABIEncode(data.size());
+        auto sizeEnc = ABIEncode_(data.size());
         acm2.insert(acm2.begin(), sizeEnc.begin(), sizeEnc.end());
         acm2.insert(acm2.end(), tails.begin(), tails.end());
         return acm2;
@@ -157,7 +158,7 @@ std::vector<unsigned char> ABIEncode(const T &data) {
         tmp.reserve(data.size());
         std::copy(data.begin(), data.end(), std::back_inserter(tmp));
         tmp = padBackTo(std::move(tmp), 32 * divRoundUp(data.size(), 32));
-        auto lenEnc = ABIEncode(data.size());
+        auto lenEnc = ABIEncode_(data.size());
         tmp.insert(tmp.begin(), lenEnc.begin(), lenEnc.end());
         return tmp;
     // tuple type
@@ -171,7 +172,7 @@ std::vector<unsigned char> ABIEncode(const T &data) {
         for (auto &[dyn, val] : acm) {
             if (dyn) {
                 auto offset = dynSize + std::tuple_size_v<T> * 32;
-                auto offsetEnc = ABIEncode(offset);
+                auto offsetEnc = ABIEncode_(offset);
                 acm2.insert(acm2.end(), offsetEnc.begin(), offsetEnc.end());
                 dynSize += val.size();
                 tails.insert(tails.end(), val.begin(), val.end());
@@ -179,7 +180,7 @@ std::vector<unsigned char> ABIEncode(const T &data) {
                 acm2.insert(acm2.end(), val.begin(), val.end());
             }
         }
-        // auto dynSizeEnc = ABIEncode(dynSize);
+        // auto dynSizeEnc = ABIEncode_(dynSize);
         // acm2.insert(acm2.begin(), dynSizeEnc.begin(), dynSizeEnc.end());
         acm2.insert(acm2.end(), tails.begin(), tails.end());
         return acm2;
@@ -191,12 +192,27 @@ std::vector<unsigned char> ABIEncode(const T &data) {
     }
 }
 
+template <typename... Args>
+std::vector<unsigned char> ABIEncode(Args &&... args) {
+    if constexpr (sizeof...(args) == 0) {
+        return {};
+    } else if constexpr (sizeof...(args) == 1) {
+        return ABIEncode_(std::forward<Args>(args)...);
+    } else return ABIEncode_(std::make_tuple(std::forward<Args>(args)...));
+}
+
 template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data) {
     if (data.size() % 32 != 0) {
         throw std::runtime_error("Invalid decode data size");
     }
     if constexpr (std::is_same_v<T, boost::multiprecision::uint256_t>) {
         return fromBytes(data.begin());
+    } else if constexpr (std::is_unsigned_v<T>) {
+        return static_cast<T>(fromBytes(data.begin()));
+    } else if constexpr (std::is_same_v<T, boost::multiprecision::int256_t>) {
+        return fromBytes<true>(data.begin());
+    } else if constexpr (std::is_unsigned_v<T>) {
+        return static_cast<T>(fromBytes<true>(data.begin()));
     } else {
         static_assert(always_false<T>, "Unsupported type");
     }

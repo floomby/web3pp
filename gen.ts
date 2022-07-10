@@ -95,14 +95,14 @@ const caller = (tx: boolean, name: string) => {
         throw std::runtime_error("Unable to call function (${name}): " + value_to<std::string>(results.at("error").at("message")));
     }
     std::cout << "Returned: " << results.at("result") << std::endl;
-    auto bytes = hexToBytes(value_to<std::string>(results.at("result")));`
+    auto bytes = Web3::hexToBytes(value_to<std::string>(results.at("result")));`
 }
 
 const body = (argCount: number, sig: string, tx: boolean) => {
   const callable = `if (address.isZero()) throw std::runtime_error("Contract must have an address");`;
   const h = keccak256(sig).toString('hex');
   const sel = `std::vector<unsigned char> selector{0x${h.substring(0,2)}, 0x${h.substring(2,4)}, 0x${h.substring(4,6)}, 0x${h.substring(6,8)}};`;
-  const encoded = `auto encoded = Web3::Encoder::ABIEncode(${tuplize(Array(argCount).fill(1).map((v:number, idx:number) => `arg${idx}`).join(", "), argCount)});`;
+  const encoded = `auto encoded = Web3::Encoder::ABIEncode(${Array(argCount).fill(1).map((v:number, idx:number) => `arg${idx}`).join(", ")});`;
   const append = `encoded.insert(encoded.begin(), selector.begin(), selector.end());`;
   return `{\n${fm(callable)}${fm(sel)}${fm(encoded)}${fm(append)}${caller(tx, sig.split('(')[0])}\n}`;
 };

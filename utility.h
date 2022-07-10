@@ -296,6 +296,9 @@ template <typename T> std::vector<unsigned char> integralToBytes(T val) {
         asUnsigned >>= 8;
     }
     std::reverse(bytes.begin(), bytes.end());
+    if (bytes.size() == 0) {
+        bytes.push_back(0);
+    }
     return bytes;
 }
 

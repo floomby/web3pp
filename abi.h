@@ -201,21 +201,49 @@ std::vector<unsigned char> ABIEncode(Args &&... args) {
     } else return ABIEncode_(std::make_tuple(std::forward<Args>(args)...));
 }
 
+template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std::vector<unsigned char>::const_iterator &it) {
+    if constexpr (std::is_same_v<T, boost::multiprecision::uint256_t>) {
+        auto ret = fromBytes(it);
+        it += 32;
+        return ret;
+    } else if constexpr (std::is_unsigned_v<T>) {
+        auto ret = static_cast<T>(fromBytes(it));
+        it += 32;
+        return ret;
+    } else if constexpr (std::is_same_v<T, boost::multiprecision::int256_t>) {
+        auto ret = fromBytes<true>(it);
+        it += 32;
+        return ret;
+    } else if constexpr (std::is_signed_v<T>) {
+        auto ret = static_cast<T>(fromBytes<true>(it));
+        it += 32;
+        return ret;
+    } else if constexpr (std::is_same_v<T, std::vector<unsigned char>>) {
+        auto len = ABIDecodeTo<size_t>(data, it);
+        std::vector<unsigned char> ret(len);
+        auto bytesToRead = divRoundUp(len, 32);
+        std::copy_n(it, len, ret.begin());
+        it += bytesToRead;
+        return ret;
+    } else if constexpr (is_std_vector<T>::value) {
+        auto len = ABIDecodeTo<size_t>(data, it);
+        T ret;
+        ret.reserve(len);
+        for (size_t i = 0; i < len; i++) {
+            ret.push_back(ABIDecodeTo<typename std_vector_type<T>::type>(data, it));
+        }
+        return ret;
+    } else {
+        static_assert(always_false<T>, "Unsupported type");
+    }
+}
+
 template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data) {
     if (data.size() % 32 != 0) {
         throw std::runtime_error("Invalid decode data size");
     }
-    if constexpr (std::is_same_v<T, boost::multiprecision::uint256_t>) {
-        return fromBytes(data.begin());
-    } else if constexpr (std::is_unsigned_v<T>) {
-        return static_cast<T>(fromBytes(data.begin()));
-    } else if constexpr (std::is_same_v<T, boost::multiprecision::int256_t>) {
-        return fromBytes<true>(data.begin());
-    } else if constexpr (std::is_unsigned_v<T>) {
-        return static_cast<T>(fromBytes<true>(data.begin()));
-    } else {
-        static_assert(always_false<T>, "Unsupported type");
-    }
+    auto it = data.begin();
+    return ABIDecodeTo<T>(data, it);
 }
 
 }  // namespace Encoder

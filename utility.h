@@ -40,27 +40,42 @@ inline auto fromBytes(const std::vector<unsigned char> &bytes) {
     return ret;
 }
 
+#define signFix \
+    if constexpr (isSigned) { \
+        boost::multiprecision::int256_t ret; \
+        if (imp >> 255) { \
+            ret = ~imp + 1; \
+            ret.backend().sign(true); \
+            return ret; \
+        } else { \
+            ret = imp.convert_to<boost::multiprecision::int256_t>(); \
+            return ret; \
+        } \
+    } else { \
+        return imp; \
+    }
+
 template <bool isSigned = false>
 inline auto fromBytes(const std::vector<unsigned char>::const_iterator &begin, size_t size = 32) {
-    typename Signedness<isSigned>::type ret;
-    boost::multiprecision::import_bits(ret, begin, begin + size, 0, true);
-    return ret;
+    boost::multiprecision::uint256_t imp;
+    boost::multiprecision::import_bits(imp, begin, begin + size, 0, true);
+    signFix
 }
 
 template <size_t N, bool isSigned = false> auto fromBytes(const std::array<unsigned char, N> &bytes) {
     static_assert(N == 32, "Only 32 bytes are supported");
-    typename Signedness<isSigned>::type ret;
-    boost::multiprecision::import_bits(ret, bytes.data(), bytes.data() + bytes.size(), 0, true);
-    return ret;
+    boost::multiprecision::uint256_t imp;
+    boost::multiprecision::import_bits(imp, bytes.data(), bytes.data() + bytes.size(), 0, true);
+    signFix
 }
 
 template <typename T, bool isSigned = false> auto fromBytes(const T &bytes) {
     if (bytes.size() > 32) {
         throw std::runtime_error("Up to 32 bytes are supported");
     }
-    typename Signedness<isSigned>::type ret;
-    boost::multiprecision::import_bits(ret, bytes.data(), bytes.data() + bytes.size(), 0, true);
-    return ret;
+    boost::multiprecision::uint256_t imp;
+    boost::multiprecision::import_bits(imp, bytes.data(), bytes.data() + bytes.size(), 0, true);
+    signFix
 }
 
 template <bool isSigned = false> Signedness<isSigned>::type fromString(const std::string &str) {

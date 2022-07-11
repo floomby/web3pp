@@ -3,6 +3,7 @@
 #include <string_view>
 #include <type_traits>
 #include <list>
+#include <optional>
 
 #include "utility.h"
 
@@ -58,10 +59,11 @@ struct get_tuple_type<0, std::tuple<T, Ts...>> {
 template <typename T, size_t Idx>
 bool constexpr is_dynamic_t() {
     static_assert(is_std_tuple<T>::value, "T must be a std::tuple");
-    if (Idx == 0) {
+    if constexpr (Idx == 0) {
         return false;
+    } else {
+        return is_dynamic<typename get_tuple_type<Idx, T>::type>() || is_dynamic_t<T, Idx - 1>();
     }
-    return is_dynamic<get_tuple_type<Idx, T>::type>() || is_dynamic_t<T, Idx - 1>();
 }
 
 template <typename T>
@@ -180,8 +182,6 @@ std::vector<unsigned char> ABIEncode_(const T &data) {
                 acm2.insert(acm2.end(), val.begin(), val.end());
             }
         }
-        // auto dynSizeEnc = ABIEncode_(dynSize);
-        // acm2.insert(acm2.begin(), dynSizeEnc.begin(), dynSizeEnc.end());
         acm2.insert(acm2.end(), tails.begin(), tails.end());
         return acm2;
     } else if constexpr (std::is_same_v<T, Function>) { 
@@ -192,6 +192,37 @@ std::vector<unsigned char> ABIEncode_(const T &data) {
     }
 }
 
+template <typename T> constexpr size_t sizeofHeadEncoding();
+
+template <typename T, size_t N> constexpr size_t sizeofStaticTuple() {
+    if constexpr (N == 0) {
+        return sizeofHeadEncoding<get_tuple_type<N, T>::type>();
+    } else {
+        return sizeofStaticTuple<T, N - 1>() + sizeofHeadEncoding<get_tuple_type<N, T>::type>();
+    }
+}
+
+// template <typename T, bool B> struct sizeofHeadEncoding_ {};
+// template <typename T> struct sizeofHeadEncoding_<T, true> { static constexpr size_t value = 1; };
+// template <typename T> struct sizeofHeadEncoding_<T, false> { static constexpr size_t value = sizeofHeadEncoding__<T>::value; };
+
+template <typename T> constexpr size_t sizeofHeadEncoding() {
+    if (!is_dynamic<T>()) {
+        if constexpr (is_std_array<T>::value) {
+            return sizeofHeadEncoding<std_array_type<T>::type>() * std_array_size<T>::value;
+        }
+        if constexpr (is_std_tuple<T>::value) {
+            if constexpr (std::tuple_size_v<T> == 0) {
+                return 0;
+            } else {
+                return sizeofStaticTuple<T, std::tuple_size_v<T> - 1>();
+            }
+        }
+        return 1;
+    }
+};
+
+
 template <typename... Args>
 std::vector<unsigned char> ABIEncode(Args &&... args) {
     if constexpr (sizeof...(args) == 0) {
@@ -199,6 +230,33 @@ std::vector<unsigned char> ABIEncode(Args &&... args) {
     } else if constexpr (sizeof...(args) == 1) {
         return ABIEncode_(std::forward<Args>(args)...);
     } else return ABIEncode_(std::make_tuple(std::forward<Args>(args)...));
+}
+
+template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std::vector<unsigned char>::const_iterator &it);
+
+template <typename T, size_t N> auto ABIDecodeTuple(const std::vector<unsigned char> &data, std::vector<unsigned char>::const_iterator &it, std::optional<std::vector<unsigned char>::const_iterator> start = {}) {
+    if (!start) {
+        start = it;
+    }
+    constexpr auto size = std::tuple_size_v<T>;
+    using curType = get_tuple_type<size - N - 1, T>::type;
+    if constexpr (is_dynamic<T>()) {
+        auto offset = ABIDecodeTo<size_t>(data, it);
+        auto itTmp = *start + offset;
+        auto tmp = ABIDecodeTo<curType>(data, itTmp);
+        if constexpr (N == 0) {
+            return std::make_tuple(tmp);
+        } else {
+            return std::tuple_cat(ABIDecodeTuple<T, N - 1>(data, it, start), std::make_tuple(tmp));
+        }
+    } else {
+        auto tmp = ABIDecodeTo<curType>(data, it);
+        if constexpr (N == 0) {
+            return std::make_tuple(tmp);
+        } else {
+            return std::tuple_cat(ABIDecodeTuple<T, N - 1>(data, it, start), std::make_tuple(tmp));
+        }
+    }
 }
 
 template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std::vector<unsigned char>::const_iterator &it) {
@@ -218,20 +276,47 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std:
         auto ret = static_cast<T>(fromBytes<true>(it));
         it += 32;
         return ret;
+    // bytes type
     } else if constexpr (std::is_same_v<T, std::vector<unsigned char>>) {
         auto len = ABIDecodeTo<size_t>(data, it);
         std::vector<unsigned char> ret(len);
-        auto bytesToRead = divRoundUp(len, 32);
+        auto bytesToRead = divRoundUp(len, 32) * 32;
         std::copy_n(it, len, ret.begin());
         it += bytesToRead;
         return ret;
+    // type[] type
     } else if constexpr (is_std_vector<T>::value) {
         auto len = ABIDecodeTo<size_t>(data, it);
         T ret;
         ret.reserve(len);
-        for (size_t i = 0; i < len; i++) {
-            ret.push_back(ABIDecodeTo<typename std_vector_type<T>::type>(data, it));
+        if constexpr (is_dynamic<typename std_vector_type<T>::type>()) {
+            auto start = it;
+            for (size_t i = 0; i < len; i++) {
+                auto offset = ABIDecodeTo<size_t>(data, it);
+                auto itTmp = start + offset;
+                ret.push_back(ABIDecodeTo<typename std_vector_type<T>::type>(data, itTmp));
+            }
+            return ret;
+        } else {
+            for (size_t i = 0; i < len; i++) {
+                ret.push_back(ABIDecodeTo<typename std_vector_type<T>::type>(data, it));
+            }
+            return ret;
         }
+    // string type
+    } else if constexpr (is_std_tuple<T>::value) {
+        return ABIDecodeTuple<T, std::tuple_size_v<T> - 1>(data, it);
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        auto len = ABIDecodeTo<size_t>(data, it);
+        std::string ret;
+        auto bytesToRead = divRoundUp(len, 32) * 32;
+        std::copy_n(it, len, std::back_inserter(ret));
+        it += bytesToRead;
+        return ret;
+    // address type
+    } else if constexpr (std::is_same_v<T, Address>) {
+        Address ret;
+        std::copy_n(it + 12, 20, ret.bytes.begin());
         return ret;
     } else {
         static_assert(always_false<T>, "Unsupported type");

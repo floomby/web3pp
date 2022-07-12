@@ -168,17 +168,22 @@ template <class T> struct std_vector_type { static_assert(always_false<T>, "Not 
 template <class T> struct std_vector_type<std::vector<T>> { typedef T type; };
 
 template <typename T = std::vector<unsigned char>> T hexToBytes(const std::string &hex) {
-    auto offset = hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X') ? 2 : 0;
+    if (hex.empty()) return {};
+    if (hex.size() == 1) throw std::runtime_error("Invalid hex string");
+    size_t offset = hex[0] == '"' ? 1 : 0;
+    if (offset && hex.back() != '"') throw std::runtime_error("Invalid hex string");
+    if (hex.size() < offset + 2) throw std::runtime_error("Invalid hex string");
+    offset += hex[offset + 0] == '0' && (hex[offset + 1] == 'x' || hex[offset + 1] == 'X') ? 2 : 0;
     T bytes;
     if (hex.length() % 2 != 0) {
         throw std::runtime_error("Invalid hex string");
     }
     if constexpr (is_std_array<T>::value) {
-        if ((hex.length()  - offset) / 2 != bytes.size()) {
+        if ((hex.length()  - offset - offset % 2) / 2 != bytes.size()) {
             throw std::runtime_error("Invalid hex string (length mismatch to fixed size container)");
         }
     }
-    for (unsigned int i = 0; i < hex.length(); i += 2) {
+    for (unsigned int i = 0; i < hex.length() - offset - offset % 2; i += 2) {
         char byte = (char)std::strtol(hex.substr(i + offset, 2).c_str(), NULL, 16);
         if constexpr (is_std_array<T>::value) {
             bytes[i / 2] = byte;

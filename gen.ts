@@ -42,16 +42,16 @@ const argType = (t: string) => {
   }
 };
 
-const retTypeComposite = (ts: string[]) => {
-  return "void";
-  if (ts.length === 0) {
-    return "void";
-  } else if (ts.length === 1) {
-    return retType(ts[0]);
-  } else {
-    return `std::tuple<${ts.map(retType).join(", ")}>`;
-  }
-};
+// const retTypeComposite = (ts: string[]) => {
+//   return "void";
+//   if (ts.length === 0) {
+//     return "void";
+//   } else if (ts.length === 1) {
+//     return retType(ts[0]);
+//   } else {
+//     return `std::tuple<${ts.map(retType).join(", ")}>`;
+//   }
+// };
 
 const indent = (x: string) => {
   return x.split("\n").map((l: string) => `    ${l}`).join("\n");
@@ -68,7 +68,7 @@ const tuplize = (x: string, count: number) => {
 
 const fm = (x: string) => `    ${x}\n`;
 
-const caller = (tx: boolean, name: string) => {
+const caller = (tx: boolean, name: string, outputs: string[]) => {
   return tx ? `
     if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
     const auto nonce = context->signers.front()->getTransactionCount();
@@ -94,17 +94,17 @@ const caller = (tx: boolean, name: string) => {
     if (results.as_object().contains("error")) {
         throw std::runtime_error("Unable to call function (${name}): " + value_to<std::string>(results.at("error").at("message")));
     }
-    std::cout << "Returned: " << results.at("result") << std::endl;
-    auto bytes = Web3::hexToBytes(value_to<std::string>(results.at("result")));`
+    auto bytes = Web3::hexToBytes(value_to<std::string>(results.at("result")));
+    return Web3::Encoder::ABIDecodeTo<${outputs.map(retType).join(", ")}>(bytes);`;
 }
 
-const body = (argCount: number, sig: string, tx: boolean) => {
+const body = (argCount: number, sig: string, tx: boolean, outputs: string[]) => {
   const callable = `if (address.isZero()) throw std::runtime_error("Contract must have an address");`;
   const h = keccak256(sig).toString('hex');
   const sel = `std::vector<unsigned char> selector{0x${h.substring(0,2)}, 0x${h.substring(2,4)}, 0x${h.substring(4,6)}, 0x${h.substring(6,8)}};`;
   const encoded = `auto encoded = Web3::Encoder::ABIEncode(${Array(argCount).fill(1).map((v:number, idx:number) => `arg${idx}`).join(", ")});`;
   const append = `encoded.insert(encoded.begin(), selector.begin(), selector.end());`;
-  return `{\n${fm(callable)}${fm(sel)}${fm(encoded)}${fm(append)}${caller(tx, sig.split('(')[0])}\n}`;
+  return `{\n${fm(callable)}${fm(sel)}${fm(encoded)}${fm(append)}${caller(tx, sig.split('(')[0], outputs)}\n}`;
 };
 
 const className = ((x:string) => x.charAt(0).toUpperCase() + x.slice(1))(process.argv[2].split(".")[0]);
@@ -124,10 +124,10 @@ class ${className} : public Web3::Contract {
 parsed.filter((x: any) => x.type === "function").forEach((x: any) => {
   const name = x.name;
   const inputs = x.inputs.map((y: any) => y.type);
-  const outputs = x.outputs.map((y: any) => y.type);
+  const outputs = x.outputs.map((y: any) => y.type as string);
   const mut = x.stateMutability;
   const signature = `${name}(${inputs.join(",")})`;
-  const builder = indent(`inline ${retTypeComposite(outputs)} ${name}(${argTypes(inputs)}) ${body(inputs.length, signature, mut == "payable" || mut == "nonpayable")}`);
+  const builder = indent(`inline auto ${name}(${argTypes(inputs)}) ${body(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
   console.log(builder);
 });
 

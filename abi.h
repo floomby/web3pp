@@ -192,37 +192,6 @@ std::vector<unsigned char> ABIEncode_(const T &data) {
     }
 }
 
-template <typename T> constexpr size_t sizeofHeadEncoding();
-
-template <typename T, size_t N> constexpr size_t sizeofStaticTuple() {
-    if constexpr (N == 0) {
-        return sizeofHeadEncoding<get_tuple_type<N, T>::type>();
-    } else {
-        return sizeofStaticTuple<T, N - 1>() + sizeofHeadEncoding<get_tuple_type<N, T>::type>();
-    }
-}
-
-// template <typename T, bool B> struct sizeofHeadEncoding_ {};
-// template <typename T> struct sizeofHeadEncoding_<T, true> { static constexpr size_t value = 1; };
-// template <typename T> struct sizeofHeadEncoding_<T, false> { static constexpr size_t value = sizeofHeadEncoding__<T>::value; };
-
-template <typename T> constexpr size_t sizeofHeadEncoding() {
-    if (!is_dynamic<T>()) {
-        if constexpr (is_std_array<T>::value) {
-            return sizeofHeadEncoding<std_array_type<T>::type>() * std_array_size<T>::value;
-        }
-        if constexpr (is_std_tuple<T>::value) {
-            if constexpr (std::tuple_size_v<T> == 0) {
-                return 0;
-            } else {
-                return sizeofStaticTuple<T, std::tuple_size_v<T> - 1>();
-            }
-        }
-        return 1;
-    }
-};
-
-
 template <typename... Args>
 std::vector<unsigned char> ABIEncode(Args &&... args) {
     if constexpr (sizeof...(args) == 0) {

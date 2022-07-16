@@ -21,7 +21,6 @@ class Account {
    public:
     bool canSign = false;
     Address address;
-    size_t nonce = 0;
 
     Account() = delete;
     inline explicit Account(const std::string &privateKeyHex, std::shared_ptr<Context> context = defaultContext) : Account(hexToBytes(privateKeyHex), context) {}
@@ -71,8 +70,6 @@ class Account {
             throw std::runtime_error("Unable to create public key");
         }
 
-        // std::cout << "public key: ";
-
         if (!EC_POINT_mul(context->crypto.group, pubKey, tmpKey, NULL, NULL, NULL)) {
             EC_KEY_free(this->privateKey);
             EC_POINT_free(pubKey);
@@ -103,8 +100,6 @@ class Account {
         std::copy(kec.begin() + 12, kec.end(), address.bytes.begin());
 
         EC_POINT_free(pubKey);
-
-        nonce = getTransactionCount();
     }
     ~Account() {
         if (privateKey) {
@@ -167,9 +162,6 @@ class Account {
             BN_CTX_free(ctx);
             throw std::runtime_error("Unable to get group order");
         };
-        // std::cout << "Group order: ";
-        // BN_print_fp(stdout, order);
-        // std::cout << std::endl;
 
         auto R = EC_POINT_new(context->crypto.group);
         if (!R) {

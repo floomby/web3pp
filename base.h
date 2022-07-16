@@ -77,13 +77,17 @@ struct Context {
 
    private:
     inline void runner() {
-        while (running) {
-            try {
-                ioContext.run();
-            } catch (...) {
-                std::exception_ptr p = std::current_exception();
-                std::clog << (p ? p.__cxa_exception_type()->name() : "null") << std::endl;
+        try {
+            while (running) {
+                try {
+                    ioContext.run();
+                } catch (std::exception &e) {
+                    std::cout << "Error: " << e.what() << std::endl;
+                }
             }
+        } catch (...) {
+            std::exception_ptr p = std::current_exception();
+            std::clog << (p ? p.__cxa_exception_type()->name() : "null") << std::endl;
         }
     }
 

@@ -6,6 +6,22 @@
 #include "account.h"
 
 namespace Web3 {
+
+template <typename F, typename... Ts> struct CallWrapper {
+    std::string name;
+    F f;
+    CallWrapper(F &&f, std::string &&name) : name(std::move(name)), f(std::move(f)) {}
+    void operator()(const std::string &str){ 
+        auto results = boost::json::parse(str);
+        if (results.as_object().contains("error")) {
+            std::clog << "Unable to call function (" + name + "): " + value_to<std::string>(results.at("error").at("message")) + "\\n";
+        }
+        auto bytes = Web3::hexToBytes(value_to<std::string>(results.at("result")));
+        // std::cout << "Result: " << toString(bytes) << std::endl;
+        f(Web3::Encoder::ABIDecodeTo<Ts...>(bytes));
+    };
+};
+
 class Contract {
    protected:
     const boost::multiprecision::cpp_dec_float_50 gasMult = boost::multiprecision::cpp_dec_float_50(1.2);
@@ -58,5 +74,35 @@ class Contract {
         std::cout << "Estimation: " << results.at("result") << std::endl;
         return value_to<std::string>(results.at("result"));
     }
+    template <typename F>
+    void estimateGas_async(F &&func, Address from, const char *value = "", const char *data = "", Address to = Address{}) {
+        std::vector<std::pair<std::string, std::string>> args;
+        args.push_back(std::make_pair("from", from.asString()));
+        if (strlen(value) > 0) {
+            args.push_back(std::make_pair("value", value));
+        }
+        if (strlen(data) > 0) {
+            args.push_back(std::make_pair("data", data));
+        }
+        if (!to.isZero()) {
+            args.push_back(std::make_pair("to", to.asString()));
+        }
+        std::clog << "Args: " << optionBuilder(args) << std::endl;
+        auto str = context->buildRPCJson("eth_estimateGas", "[" + optionBuilder(args) + ",\"latest\"]");
+        auto handler = [func = std::move(func)](const std::string &str) {
+            auto results = boost::json::parse(str);
+            if (results.as_object().contains("error")) {
+                std::clog << "Unable to estimate gas: " + value_to<std::string>(results.at("error").at("message")) + "\n";
+            } else {
+                func(value_to<std::string>(results.at("result")));
+            }
+        };
+        try {
+            std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
+        } catch (const std::exception &e) {
+            throw std::runtime_error("Unable to estimate gas: " + std::string(e.what()));
+        }
+    }
 };
+
 }  // namespace Web3

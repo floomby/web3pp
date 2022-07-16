@@ -124,9 +124,6 @@ template <typename T> std::vector<T> &unpadFront(std::vector<T> &v) {
         it++;
     }
     v.erase(v.begin(), it);
-    if (it != v.begin()) {
-        std::cout << "unpadded" << std::endl;
-    }
     return v;
 }
 
@@ -373,7 +370,7 @@ struct Function {
     }
 };
 
-inline std::string optionBuilder(std::vector<std::pair<std::string, std::string>> options) {
+inline std::string optionBuilder(const std::vector<std::pair<std::string, std::string>> &options) {
     std::stringstream ret;
     ret << "{";
     for (auto &[key, value] : options) {

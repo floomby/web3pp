@@ -9,8 +9,10 @@
 
 namespace Web3 {
 
+struct FixedBase {};
+
 template <bool isSigned = true, size_t M = 128, size_t N = 18>
-struct Fixed {
+struct Fixed : FixedBase {
     static_assert(8 <= M && M <= 256 && M % 8 == 0 && N <= 80, "Invalid Fixed size");
     static constexpr std::string TypeName() {
         return (isSigned ? std::string("fixed") : std::string("ufixed")) + std::to_string(M) + "x" + std::to_string(N);
@@ -20,6 +22,12 @@ struct Fixed {
         return underlying * boost::multiprecision::pow(boost::multiprecision::cpp_int(10), N).convert_to<typename Signedness<isSigned>::type>();
     }
 };
+
+// struct FixedDynamic : FixedBase {
+    // template <typename T> void operator=(const T &val) {
+    //     return T(underlying);
+    // }
+// };
 
 template <class T>
 struct is_fixed : std::false_type {};
@@ -77,19 +85,6 @@ template <typename T, size_t Idx, size_t N> std::vector<std::pair<bool, std::vec
     }
     return acm;
 }
-
-// inline std::vector<unsigned char> ABIEncode_() {
-//     return {};
-// }
-
-/**
- * @brief ABIEncode_ elements
- * 
- * @tparam T type to encode (note that std::vector<unsigned char> is bytes and not uint8[] likewise std::array<unsigned char, N> is not uint8[N]
- * but is actually bytesN) I have an idea how to maybe fix this
- * @param data 
- * @return std::vector<unsigned char> abiencoded data
- */
 
 template <typename T>
 std::vector<unsigned char> ABIEncode_(const T &data) {
@@ -230,18 +225,30 @@ template <typename T, size_t N> auto ABIDecodeTuple(const std::vector<unsigned c
 
 template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std::vector<unsigned char>::const_iterator &it) {
     if constexpr (std::is_same_v<T, boost::multiprecision::uint256_t>) {
+        if (it == data.end()) {
+            throw std::runtime_error("Insufficent data");
+        }
         auto ret = fromBytes(it);
         it += 32;
         return ret;
     } else if constexpr (std::is_unsigned_v<T>) {
+        if (it == data.end()) {
+            throw std::runtime_error("Insufficent data");
+        }
         auto ret = static_cast<T>(fromBytes(it));
         it += 32;
         return ret;
     } else if constexpr (std::is_same_v<T, boost::multiprecision::int256_t>) {
+        if (it == data.end()) {
+            throw std::runtime_error("Insufficent data");
+        }
         auto ret = fromBytes<true>(it);
         it += 32;
         return ret;
     } else if constexpr (std::is_signed_v<T>) {
+        if (it == data.end()) {
+            throw std::runtime_error("Insufficent data");
+        }
         auto ret = static_cast<T>(fromBytes<true>(it));
         it += 32;
         return ret;
@@ -301,5 +308,4 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data) {
 }
 
 }  // namespace Encoder
-
 }  // namespace Web3

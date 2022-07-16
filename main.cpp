@@ -43,12 +43,19 @@ int main(int argc, char **argv) {
         Web3::defaultContext->setPrimarySigner(account);
         try {
             demo.deploy();
+            // demo.approve(Web3::Address{"0xE9F1ad5781ae7421F07F01005ecDD8327d122136"}, Web3::fromString("1000000000000"));
+            demo.approve_async(Web3::Address{"0xE9F1ad5781ae7421F07F01005ecDD8327d122136"}, Web3::fromString("10000000000000"), []() {
+                std::cout << "approve done" << std::endl;
+            });
             demo.decimals();
-            demo.approve(Web3::Address{"0xE9F1ad5781ae7421F07F01005ecDD8327d122136"}, Web3::fromString("1000000000000"));
+            demo.decimals_async([](auto &&result) {
+                std::cout << "decimals: " << result << std::endl;
+            });
         } catch (std::exception &e) {
             std::cout << "Error: " << e.what() << std::endl;
         }
 
+        std::this_thread::sleep_for(std::chrono::seconds(10));
 
         // return EXIT_SUCCESS;
         // auto nonce = account.nonce;

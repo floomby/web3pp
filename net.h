@@ -27,8 +27,7 @@ class RPCRequest {
     boost::beast::http::response<boost::beast::http::string_body> res_;
     boost::beast::flat_buffer buffer_;
 
-   public:
-    inline RPCRequest(std::shared_ptr<Context> context, std::string &&rpcJson) : context_(context), json_(rpcJson) {
+    inline void init() {
         req_.version(11);
         req_.target("/");
         req_.method(boost::beast::http::verb::post);
@@ -38,6 +37,11 @@ class RPCRequest {
         req_.set(boost::beast::http::field::content_type, "application/json");
         req_.body() = json_;
         req_.prepare_payload();
+    }
+   public:
+    RPCRequest() = default;
+    inline RPCRequest(std::shared_ptr<Context> context, std::string &&rpcJson) : context_(context), json_(rpcJson) {
+        init();
     }
     // Move technically doesn't need to be deleted, but for right now I want to have it error if I try and move it on accident
     RPCRequest(RPCRequest &&other) = delete;
@@ -73,7 +77,7 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
         boost::beast::http::write(*stream, req_);
         boost::beast::http::read(*stream, buffer_, res_);
         std::cout << res_.body() << std::endl;
-        auto ret = boost::json::parse(res_.body());
+        auto ret = boost::json::parse("{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":\"0x0000000000000000000000000000000000000000000000000000000000000005\"}");
 
         // Idk the right way to do this?? Need to pull wireshark out to figure this out I think
         stream->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both);
@@ -92,14 +96,17 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
 };
 
 // TODO Add ssl to this
-template <typename F>
+template <typename F, bool parseResult = false>
 class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F>>, RPCRequest {
     F func;
     std::unique_ptr<boost::beast::tcp_stream> stream;
     std::unique_ptr<boost::beast::ssl_stream<boost::beast::tcp_stream>> sslStream;
 
    public:
-    explicit AsyncRPC(std::shared_ptr<Context> context, F func, std::string &&rpcJson) : RPCRequest(context, std::move(rpcJson)) {
+    explicit AsyncRPC(std::shared_ptr<Context> context, F &&func, std::string &&rpcJson) : func(std::move(func)) {
+        context_ = context;
+        json_ = std::move(rpcJson);
+        init();
         if (context_->useSsl) {
             sslStream = std::make_unique<boost::beast::ssl_stream<boost::beast::tcp_stream>>(boost::asio::make_strand(context_->ioContext), context_->sslContext);
             if (!SSL_set_tlsext_host_name(sslStream->native_handle(), context_->host.c_str())) {
@@ -158,10 +165,16 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F>>, RPCRequest {
 
         if (ec) return fail(ec, "read");
 
-        std::cout << res_.body() << std::endl;
-        func(res_.body());
-        auto parsed = boost::json::parse(res_.body());
-        prettyPrint(std::cout, parsed);
+        // std::clog << "Body: " << res_.body() << std::endl;
+        if constexpr (parseResult) {
+            try {
+                func(boost::json::parse(res_.body()));
+            } catch (const std::exception &e) {
+                std::cerr << "Error running async callback: " << e.what() << std::endl;
+            }
+        } else {
+            func(res_.body());
+        }
 
         if (context_->useSsl) {
             boost::beast::get_lowest_layer(*sslStream).expires_after(std::chrono::seconds(30));

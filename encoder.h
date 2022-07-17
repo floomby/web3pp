@@ -10,7 +10,8 @@
 namespace Web3 {
 
 namespace Encoder {
-std::string encode(const std::vector<unsigned char> &data) {
+
+inline std::string encode(const std::vector<unsigned char> &data) {
     std::stringstream ss;
     ss << "0x";
     for (const auto &byte : data) {
@@ -30,7 +31,7 @@ std::string encode(const T &data) {
     return ss.str();
 }
 
-std::string encode(const boost::multiprecision::uint256_t &data) {
+inline std::string encode(const boost::multiprecision::uint256_t &data) {
     if (data == 0) {
         return "0x0";
     }
@@ -56,7 +57,7 @@ struct RLPEncodeInput {
     }
 };
 
-void RLPEncodeLength(std::vector<unsigned char> &acm, size_t length, unsigned char prefix) {
+inline void RLPEncodeLength(std::vector<unsigned char> &acm, size_t length, unsigned char prefix) {
     auto lengthLength = divRoundUp(31 - __builtin_clz(static_cast<unsigned int>(length)), 8);
     acm.push_back(prefix + lengthLength);
     ;
@@ -68,7 +69,7 @@ void RLPEncodeLength(std::vector<unsigned char> &acm, size_t length, unsigned ch
     }
 }
 
-void RLPEncode_(std::vector<unsigned char> &acm, const RLPEncodeInput &data) {
+inline void RLPEncode_(std::vector<unsigned char> &acm, const RLPEncodeInput &data) {
     if (data.value.has_value()) {
         if (data.value->size() == 1) {
             if (data.value.value()[0] == 0) {
@@ -106,7 +107,7 @@ void RLPEncode_(std::vector<unsigned char> &acm, const RLPEncodeInput &data) {
     }
 }
 
-std::vector<unsigned char> encode(const RLPEncodeInput &data) {
+inline std::vector<unsigned char> encode(const RLPEncodeInput &data) {
     std::vector<unsigned char> acm;
     RLPEncode_(acm, data);
     return acm;
@@ -138,7 +139,7 @@ std::vector<unsigned char> RLPEncode(const T &first) {
     return encode(RLPEncodeInput(first));
 }
 
-std::vector<unsigned char> RLPEncode() {
+inline std::vector<unsigned char> RLPEncode() {
     return {0xc0};
 }
 

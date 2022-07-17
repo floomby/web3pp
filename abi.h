@@ -42,7 +42,7 @@ bool constexpr is_dynamic_t();
 template <typename T>
 bool constexpr is_dynamic() {
     using t = std::remove_cv_t<std::remove_reference_t<T>>;
-    if (is_std_vector<t>::value || std::is_same_v<t, std::string>) {
+    if (is_std_vector<t>::value || std::is_same_v<t, std::string> || std::is_same_v<t, const char *>) {
         return true;
     }
     if constexpr (is_std_tuple<t>::value) {
@@ -150,6 +150,8 @@ std::vector<unsigned char> ABIEncode_(const T &data) {
         acm2.insert(acm2.end(), tails.begin(), tails.end());
         return acm2;
     // string type
+    } else if constexpr (std::is_same_v<T, const char *>) {
+        return ABIEncode_(std::string(data));
     } else if constexpr (std::is_same_v<T, std::string>) {
         std::vector<unsigned char> tmp;
         tmp.reserve(data.size());

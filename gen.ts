@@ -134,7 +134,7 @@ const body_ = (argCount: number, sig: string, tx: boolean, outputs: string[], c:
 const body = (argCount: number, sig: string, tx: boolean, outputs: string[]) => body_(argCount, sig, tx, outputs, caller);
 const body_async = (argCount: number, sig: string, tx: boolean, outputs: string[]) => body_(argCount, sig, tx, outputs, caller_async);
 
-const className = ((x:string) => x.charAt(0).toUpperCase() + x.slice(1))(process.argv[2].split(".")[0]);
+const className = ((x:string) => x.charAt(0).toUpperCase() + x.slice(1))(process.argv[2].split(".")[0]).replace("-", "_");
 
 console.log(
 `// This is an auto-generated file.

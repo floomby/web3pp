@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@enumatech/secp256k1-js": "^1.0.0",
+    "@openzeppelin/contracts": "^4.7.0",
+    "express": "^4.18.1",
+    "hardhat": "^2.9.9",
+    "keccak256": "^1.0.6",
+    "number-to-bn": "^1.7.0",
+    "ts-node": "^10.8.2",
+    "tsc": "^2.0.4",
+    "web3": "^1.7.4"
+  }
+}

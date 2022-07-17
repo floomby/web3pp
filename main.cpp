@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
         auto account = std::make_shared<Web3::Account>(std::string{"387e50a4fa783cb44d1d579a0810f169e81f5d2e705615c483aa3c208d25f966"});
         Web3::defaultContext->setPrimarySigner(account);
         try {
-            demo.deploy();
+            demo.deploy(std::string("abcdefg"));
             // demo.approve(Web3::Address{"0xE9F1ad5781ae7421F07F01005ecDD8327d122136"}, Web3::fromString("1000000000000"));
             demo.approve_async(Web3::Address{"0xE9F1ad5781ae7421F07F01005ecDD8327d122136"}, Web3::fromString("10000000000000"), []() {
                 std::cout << "approve done" << std::endl;

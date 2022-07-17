@@ -7,12 +7,13 @@
 #include <boost/asio.hpp>
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
+#include <iostream>
 #include <memory>
 #include <string>
 
 #ifdef _WIN32
 #include <wincrypt.h>
-void add_windows_root_certs(boost::asio::ssl::context &ctx) {
+inline void add_windows_root_certs(boost::asio::ssl::context &ctx) {
     HCERTSTORE hStore = CertOpenSystemStore(0, "ROOT");
     if (hStore == NULL) {
         return;

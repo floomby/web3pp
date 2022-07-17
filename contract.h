@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "account.h"
+#include "transaction.h"
 
 namespace Web3 {
 
@@ -30,14 +31,16 @@ class Contract {
    public:
     virtual const char *__data() = 0;
     Address address;
-    inline void deploy() {
+    template<typename...Ts> void deploy(Ts... args) {
         if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
         // TODO find gas price and estimate gas
-        auto gas = this->estimateGas(context->signers.front()->address, "0", __data());
+        auto encoded = Web3::Encoder::ABIEncode(args...);
+        std::string data = __data() + toString(encoded);
+        auto gas = this->estimateGas(context->signers.front()->address, "0", data.c_str());
         const auto nonce = context->signers.front()->getTransactionCount();
         boost::multiprecision::cpp_dec_float_50 gasF = fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
         Web3::Transaction tx{nonce, 0x04a817c800, gasF.convert_to<boost::multiprecision::uint256_t>(), std::vector<unsigned char>({}),
-            Web3::fromString("00"), Web3::hexToBytes(this->__data())};
+            Web3::fromString("00"), Web3::hexToBytes(data.c_str())};
 
         auto signedTx = tx.sign(*context->signers.front());
         auto h = context->signers.front()->sendRawTransaction(Web3::toString(signedTx));
@@ -71,7 +74,6 @@ class Contract {
         if (results.as_object().contains("error")) {
             throw std::runtime_error("Unable to estimate gas: " + value_to<std::string>(results.at("error").at("message")));
         }
-        std::cout << "Estimation: " << results.at("result") << std::endl;
         return value_to<std::string>(results.at("result"));
     }
     template <typename F>
@@ -87,7 +89,6 @@ class Contract {
         if (!to.isZero()) {
             args.push_back(std::make_pair("to", to.asString()));
         }
-        std::clog << "Args: " << optionBuilder(args) << std::endl;
         auto str = context->buildRPCJson("eth_estimateGas", "[" + optionBuilder(args) + ",\"latest\"]");
         auto handler = [func = std::move(func)](const std::string &str) {
             auto results = boost::json::parse(str);

@@ -4,7 +4,9 @@
 #include <iostream>
 
 #include "account.h"
+#include "ethereum.h"
 #include "transaction.h"
+#include "units.h"
 
 namespace Web3 {
 
@@ -39,11 +41,11 @@ class Contract {
         auto gas = this->estimateGas(context->signers.front()->address, "0", data.c_str());
         const auto nonce = context->signers.front()->getTransactionCount();
         boost::multiprecision::cpp_dec_float_50 gasF = fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
-        Web3::Transaction tx{nonce, 0x04a817c800, gasF.convert_to<boost::multiprecision::uint256_t>(), std::vector<unsigned char>({}),
+        Web3::Transaction tx{nonce, Units::gwei(30), gasF.convert_to<boost::multiprecision::uint256_t>(), std::vector<unsigned char>({}),
             Web3::fromString("00"), Web3::hexToBytes(data.c_str())};
 
         auto signedTx = tx.sign(*context->signers.front());
-        auto h = context->signers.front()->sendRawTransaction(Web3::toString(signedTx));
+        auto h = Ethereum::sendRawTransaction(Web3::toString(signedTx));
         std::cout << "Hash: " << h << std::endl;
         address = context->signers.front()->deployedContract(nonce);
         h.getReceipt();

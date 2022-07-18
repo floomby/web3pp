@@ -25,6 +25,7 @@
 #include "transaction.h"
 #include "utility.h"
 #include "abi.h"
+#include "ethereum.h"
 
 #include "demo.h"
 
@@ -76,6 +77,7 @@ int main(int argc, char **argv) {
 
         // auto handler = [](const std::string &str){ std::cout << "Completed" << std::endl; };
         // std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(Web3::defaultContext, handler, "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":5777}")->call();
+        std::cout << "height: " << Web3::toString(Web3::Ethereum::blockHeight()) << std::endl;
     } catch (...) {
         std::exception_ptr p = std::current_exception();
         std::cout << (p ? p.__cxa_exception_type()->name() : "null") << std::endl;

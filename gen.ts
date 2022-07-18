@@ -76,7 +76,7 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
     boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
     Web3::Transaction tx{nonce, 0x04a817c800, gasF.convert_to<boost::multiprecision::uint256_t>(), address.asVector(), Web3::fromString("00"), encoded};
     auto signedTx = tx.sign(*context->signers.front());
-    auto h = context->signers.front()->sendRawTransaction(Web3::toString(signedTx));
+    auto h = Web3::Ethereum::sendRawTransaction(Web3::toString(signedTx));
     std::cout << "Hash: " << h << std::endl;
     address = context->signers.front()->deployedContract(nonce);
     h.getReceipt();` : `

@@ -331,20 +331,6 @@ class Account {
 
         return ret;
     }
-    TransactionHash sendRawTransaction(const std::string &tx) {
-        auto str = context->buildRPCJson("eth_sendRawTransaction", "[\"0x" + tx + "\"]");
-        boost::json::value results;
-        try {
-            results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
-        } catch (const std::exception &e) {
-            throw std::runtime_error("Unable to send raw transaction: " + std::string(e.what()));
-        }
-        if (results.as_object().contains("error")) {
-            throw std::runtime_error("Unable to send raw transaction: " + value_to<std::string>(results.at("error").at("message")));
-        }
-        // std::cout << "TX: " << results.at("result") << std::endl;
-        return {context, value_to<std::string>(results.at("result"))};
-    }
     
     size_t getTransactionCount() const {
         auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");

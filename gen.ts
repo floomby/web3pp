@@ -3,10 +3,13 @@ import assert from "assert";
 import keccak256 from "keccak256";
 
 const abi = fs.readFileSync(process.argv[2] + ".abi", "utf8");
-const bin = fs.readFileSync(process.argv[2] + ".bin", "utf8");
+const bin = fs.readFileSync(process.argv[2] + ".bin", "utf8").trim();
 const parsed = JSON.parse(abi);
 
 const retType = (t: string) => {
+  const fixedMatcher = /^(u?fixed)(([\d]+)x([\d]+))?$/;
+  const match = fixedMatcher.exec(t);
+
   if (t === "address") {
     return `Web3::Address`;
   } else if (t.match(/^uint/)) {
@@ -19,12 +22,26 @@ const retType = (t: string) => {
     return `std::string`;
   } else if (t === "bytes") {
     return `std::vector<unsigned char>`;
+  } else if (match) {
+    let tp: string;
+    if (match[1] === "fixed") {
+      tp = "Web3::Fixed<true,"
+    } else {
+      assert(match[1] === "ufixed");
+      tp = "Web3::Fixed<false,"
+    }
+    const m = match[3] || "128";
+    const n = match[4] || "18";
+    return `${tp}${m},${n}>`;
   } else {
     throw new Error(`Unsupported type: ${t}`);
   }
 };
 
 const argType = (t: string) => {
+  const fixedMatcher = /^(u?fixed)(([\d]+)x([\d]+))?$/;
+  const match = fixedMatcher.exec(t);
+
   if (t === "address") {
     return `const Web3::Address &`;
   } else if (t.match(/^uint/)) {
@@ -37,6 +54,17 @@ const argType = (t: string) => {
     return `const std::string &`;
   } else if (t === "bytes") {
     return `const std::vector<unsigned char> &`;
+  } else if (match) {
+    let tp: string;
+    if (match[1] === "fixed") {
+      tp = "Web3::Fixed<true,"
+    } else {
+      assert(match[1] === "ufixed");
+      tp = "Web3::Fixed<false,"
+    }
+    const m = match[3] || "128";
+    const n = match[4] || "18";
+    return `const ${tp}${m},${n}> &`;
   } else {
     throw new Error(`Unsupported type: ${t}`);
   }
@@ -162,6 +190,6 @@ parsed.filter((x: any) => x.type === "function").forEach((x: any) => {
   console.log(builder_async);
 });
 
-console.log(indent(`virtual inline const char *__data() { return "0x${bin}"; }\n`));
+console.log(indent(`virtual inline const char *__data() { return "0x${bin}"; }`));
 
 console.log(`};`);

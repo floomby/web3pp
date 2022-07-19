@@ -25,7 +25,7 @@ struct TransactionHash {
 }
 
 namespace std {
-ostream &operator<<(ostream &os, const Web3::TransactionHash &transactionHash) {
+inline ostream &operator<<(ostream &os, const Web3::TransactionHash &transactionHash) {
     os << transactionHash.hash;
     return os;
 }

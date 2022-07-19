@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/multiprecision/cpp_dec_float.hpp>
 #include <string_view>
 #include <type_traits>
 #include <list>
@@ -17,12 +18,23 @@ struct Fixed : FixedBase {
     static constexpr std::string TypeName() {
         return (isSigned ? std::string("fixed") : std::string("ufixed")) + std::to_string(M) + "x" + std::to_string(N);
     }
-    Signedness<isSigned>::type underlying;
-    decltype(underlying) abiEncodable() const {
-        return underlying * boost::multiprecision::pow(boost::multiprecision::cpp_int(10), N).convert_to<typename Signedness<isSigned>::type>();
+    boost::multiprecision::cpp_dec_float_100 underlying;
+    Signedness<isSigned>::type abiEncodable() const {
+        return (underlying * boost::multiprecision::pow(boost::multiprecision::cpp_dec_float_100(10), N)).convert_to<typename Signedness<isSigned>::type>();
+    }
+    template <typename T>
+    Fixed(const T &value) {
+        if constexpr (std::is_same_v<T, typename Signedness<isSigned>::type>) {
+            underlying = boost::multiprecision::cpp_dec_float_100(10);
+            // underlying = value;
+            // underlying /= boost::multiprecision::pow(boost::multiprecision::cpp_int(10), N).convert_to<boost::multiprecision::cpp_dec_float_100>();
+        } else {
+            underlying = boost::multiprecision::cpp_dec_float_100(5.4);
+        }
     }
 };
 
+// TODO This is probably wanted in the future
 // struct FixedDynamic : FixedBase {
     // template <typename T> void operator=(const T &val) {
     //     return T(underlying);
@@ -181,6 +193,7 @@ std::vector<unsigned char> ABIEncode_(const T &data) {
         }
         acm2.insert(acm2.end(), tails.begin(), tails.end());
         return acm2;
+    // Function types
     } else if constexpr (std::is_same_v<T, Function>) { 
         auto ret = data.asVector();
         return padBackTo(std::move(ret), 32);
@@ -228,6 +241,7 @@ template <typename T, size_t N> auto ABIDecodeTuple(const std::vector<unsigned c
 template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std::vector<unsigned char>::const_iterator &it) {
     if constexpr (std::is_same_v<T, boost::multiprecision::uint256_t>) {
         if (it == data.end()) {
+            std::clog << "Bad buffer is: " << toString(data) << std::endl;
             throw std::runtime_error("Insufficent data");
         }
         auto ret = fromBytes(it);
@@ -235,6 +249,7 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std:
         return ret;
     } else if constexpr (std::is_unsigned_v<T>) {
         if (it == data.end()) {
+            std::clog << "Bad buffer is: " << toString(data) << std::endl;
             throw std::runtime_error("Insufficent data");
         }
         auto ret = static_cast<T>(fromBytes(it));
@@ -242,6 +257,7 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std:
         return ret;
     } else if constexpr (std::is_same_v<T, boost::multiprecision::int256_t>) {
         if (it == data.end()) {
+            std::clog << "Bad buffer is: " << toString(data) << std::endl;
             throw std::runtime_error("Insufficent data");
         }
         auto ret = fromBytes<true>(it);
@@ -249,6 +265,7 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std:
         return ret;
     } else if constexpr (std::is_signed_v<T>) {
         if (it == data.end()) {
+            std::clog << "Bad buffer is: " << toString(data) << std::endl;
             throw std::runtime_error("Insufficent data");
         }
         auto ret = static_cast<T>(fromBytes<true>(it));
@@ -296,18 +313,32 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std:
         Address ret;
         std::copy_n(it + 12, 20, ret.bytes.begin());
         return ret;
+    // fixed type
+    } else if constexpr (is_fixed<T>::value) {
+        return T(ABIDecodeTo<decltype(std::declval<T>().abiEncodable())>(data, it));
     } else {
         static_assert(always_false<T>, "Unsupported type");
     }
 }
 
-template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data) {
+template <typename... Ts> auto ABIDecodeTo(const std::vector<unsigned char> &data) {
     if (data.size() % 32 != 0) {
         throw std::runtime_error("Invalid decode data size");
     }
     auto it = data.begin();
-    return ABIDecodeTo<T>(data, it);
+    if constexpr (sizeof...(Ts) == 0) {
+        static_assert(always_false<Ts...>, "No type to decode");
+    } else if constexpr (sizeof...(Ts) == 1) {
+        return ABIDecodeTo<Ts...>(data, it);
+    } else return ABIDecodeTo<std::tuple<Ts...>>(data, it);
 }
 
 }  // namespace Encoder
 }  // namespace Web3
+
+namespace std {
+template <bool isSigned, size_t M, size_t N> ostream &operator<<(ostream &os, const Web3::Fixed<isSigned, M, N> &num) {
+    os << num.underlying;
+    return os;
+}
+}  // namespace std

@@ -355,7 +355,7 @@ class Account {
 }  // namespace Web3
 
 namespace std {
-std::ostream &operator<<(std::ostream &os, const Web3::Signature &sig) {
+inline std::ostream &operator<<(std::ostream &os, const Web3::Signature &sig) {
     os << "v: " << Web3::toString(sig.v) << " r: " << Web3::toString(sig.r) << " s: " << Web3::toString(sig.s);
     return os;
 }

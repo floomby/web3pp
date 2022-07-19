@@ -1,6 +1,6 @@
 ## Web3pp
 
-Header only Ethereum rpc library for c++.
+Header only Ethereum interaction library for c++.
 
 This library depends only on some boost libraries and openssl.
 
@@ -8,13 +8,12 @@ This library depends only on some boost libraries and openssl.
 
 ### Things to finish
 
-* Finish fixed type handling
-* Make deployment not a variadic template so type hinting is available
+* Troubleshoot fixed point returns from rpc (I don't think this is my problem)
 * Call options (value, gas override, gas price, alternative signer)
-* Come up with a good way to map solidity structs into c++ objects
 * Work on library consistency
 * Documentation
 * Better testing coverage (abi decoding needs some work)
+* Make deployment not a variadic template so type hinting is available
 
 ### More things I need to finish
 
@@ -25,5 +24,5 @@ This library depends only on some boost libraries and openssl.
 ### Longer term features
 
 * Websocket support
-* Some utility stuff
+* Some utility stuff (ecrecover, direct storage access, address checksums)
 * Eip1559 and eip2930 transaction support

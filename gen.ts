@@ -98,18 +98,53 @@ const fm = (x: string) => `    ${x}\n`;
 
 const caller = (tx: boolean, name: string, outputs: string[]) => {
   return tx ? `
-    if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
-    const auto nonce = context->signers.front()->getTransactionCount();
-    auto gas = estimateGas(context->signers.front()->address, "0", Web3::toString(encoded).c_str(), address);
-    boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
-    Web3::Transaction tx{nonce, 0x04a817c800, gasF.convert_to<boost::multiprecision::uint256_t>(), address.asVector(), Web3::fromString("00"), encoded};
-    auto signedTx = tx.sign(*context->signers.front());
+    boost::multiprecision::uint256_t txGas;
+    size_t nonce;
+    if (options && options->nonce) {
+        nonce = *options->nonce;
+    } else {
+        nonce = context->signers.front()->getTransactionCount();
+    }
+    if (options && options->gasLimit) {
+        txGas = *options->gasLimit;
+    } else {
+        auto gas = this->estimateGas(context->signers.front()->address, "0", encoded);
+        boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
+        txGas = gasF.convert_to<boost::multiprecision::uint256_t>();
+    }
+    boost::multiprecision::uint256_t txPrice;
+    if (options && options->gasPrice) {
+        txPrice = *options->gasPrice;
+    } else {
+        txPrice = Web3::Units::gwei(30);
+    }
+    boost::multiprecision::uint256_t txValue;
+    if (options && options->value) {
+        txValue = *options->value;
+    } else {
+        txValue = 0;
+    }
+    Web3::Transaction tx{nonce, txPrice, txGas, std::vector<unsigned char>({}), txValue, encoded};
+    std::shared_ptr<Web3::Account> signer;
+    if (options && options->account) {
+        signer = options->account;
+    } else {
+        if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
+        signer = context->signers.front();
+    }
+    auto signedTx = tx.sign(*signer);
     auto h = Web3::Ethereum::sendRawTransaction(Web3::toString(signedTx));
     std::cout << "Hash: " << h << std::endl;
-    address = context->signers.front()->deployedContract(nonce);
     h.getReceipt();` : `
+    std::shared_ptr<Web3::Account> signer;
+    if (options && options->account) {
+        signer = options->account;
+    } else {
+        if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
+        signer = context->signers.front();
+    }
     auto str = context->buildRPCJson("eth_call", "[" + Web3::optionBuilder({
-        {"from", context->signers.front()->address.asString()},
+        {"from", signer->address.asString()},
         {"to", address.asString()},
         {"data", "0x" + Web3::toString(encoded)}
     }) + ",\\"latest\\"]");
@@ -126,19 +161,72 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
     return Web3::Encoder::ABIDecodeTo<true, ${outputs.map(retType).join(", ")}>(bytes);`;
 }
 
+// Confusing, high class mess right here, hopefully I don't have to touch this except for adding support for other transaction types
 const caller_async = (tx: boolean, name: string, outputs: string[]) => {
   return tx ? `
-    if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
-    auto handler = [this, encoded](const std::string &gas) {
-        boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * this->gasMult;
-        Web3::Transaction tx{1234, 0x04a817c800, gasF.convert_to<boost::multiprecision::uint256_t>(), address.asVector(), Web3::fromString("00"), encoded};
-        auto signedTx = tx.sign(*context->signers.front());
-        std::cout << "Signed transaction: " << Web3::toString(signedTx) << std::endl;
-    };
-    estimateGas_async(std::move(handler), context->signers.front()->address, "0", Web3::toString(encoded).c_str(), address);
+    std::shared_ptr<Web3::Account> signer;
+    if (options && options->account) {
+        signer = options->account;
+    } else {
+        if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
+        signer = context->signers.front();
+    }
+    boost::multiprecision::uint256_t txValue;
+    if (options && options->value) {
+        txValue = *options->value;
+    } else {
+        txValue = 0;
+    }
+    boost::multiprecision::uint256_t txPrice;
+    if (options && options->gasPrice) {
+        txPrice = *options->gasPrice;
+    } else {
+        txPrice = Web3::Units::gwei(30);
+    }
+    
+    // auto rawSender = [this, encoded, signer, txValue, txPrice, func = std::move(func)](size_t nonce, boost::multiprecision::uint256_t &&gasLimit) {
+    //     Web3::Transaction tx{nonce, txPrice, txGas, std::vector<unsigned char>({}), txValue, encoded};
+    //     auto signedTx = tx.sign(*signer);
+    //     auto str = context->buildRPCJson("eth_sendRawTransaction", "[\\"0x" + tx + "\\"]");
+    //     std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(this->context, std::move(handler), std::move(str))->call();
+    // };
+    
+    // size_t nonce;
+    // if (options && options->nonce) {
+    //     nonce = *options->nonce;
+    // } else {
+    //     nonce = signer->getTransactionCount_async(std::move(gasGetter));
+    // }
+
+
+    // boost::multiprecision::uint256_t txGas;
+    // if (options && options->gasLimit) {
+    //     txGas = *options->gasLimit;
+    // } else {
+    //     auto gas = this->estimateGas(context->signers.front()->address, "0", data.c_str());
+    //     boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
+    //     txGas = gasF.convert_to<boost::multiprecision::uint256_t>();
+    // }
+
+
+
+    // auto handler = [this, encoded](const std::string &gas) {
+    //     boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * this->gasMult;
+    //     Web3::Transaction tx{1234, 0x04a817c800, gasF.convert_to<boost::multiprecision::uint256_t>(), address.asVector(), Web3::fromString("00"), encoded};
+    //     auto signedTx = tx.sign(*signer.front());
+    //     std::cout << "Signed transaction: " << Web3::toString(signedTx) << std::endl;
+    // };
+    // estimateGas_async(std::move(handler), signer.front()->address, "0", Web3::toString(encoded).c_str(), address);
     ` : `
+    std::shared_ptr<Web3::Account> signer;
+    if (options && options->account) {
+        signer = options->account;
+    } else {
+        if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
+        signer = context->signers.front();
+    }
     auto str = context->buildRPCJson("eth_call", "[" + Web3::optionBuilder({
-        {"from", context->signers.front()->address.asString()},
+        {"from", signer->address.asString()},
         {"to", address.asString()},
         {"data", "0x" + Web3::toString(encoded)}
     }) + ",\\"latest\\"]");
@@ -150,11 +238,13 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
     }`;
 }
 
+const argLister = (argCount: number) => Array(argCount).fill(1).map((v:number, idx:number) => `arg${idx}`).join(", ");
+
 const body_ = (argCount: number, sig: string, tx: boolean, outputs: string[], c: (tx: boolean, name: string, outputs: string[]) => string) => {
   const callable = `if (address.isZero()) throw std::runtime_error("Contract must have an address");`;
   const h = keccak256(sig).toString('hex');
   const sel = `std::vector<unsigned char> selector{0x${h.substring(0,2)}, 0x${h.substring(2,4)}, 0x${h.substring(4,6)}, 0x${h.substring(6,8)}};`;
-  const encoded = `auto encoded = Web3::Encoder::ABIEncode(${Array(argCount).fill(1).map((v:number, idx:number) => `arg${idx}`).join(", ")});`;
+  const encoded = `auto encoded = Web3::Encoder::ABIEncode(${argLister(argCount)});`;
   const append = `encoded.insert(encoded.begin(), selector.begin(), selector.end());`;
   return `{\n${fm(callable)}${fm(sel)}${fm(encoded)}${fm(append)}${c(tx, sig.split('(')[0], outputs)}\n}`;
 };
@@ -178,14 +268,30 @@ class ${className} : public Web3::Contract {
 
 const comma = (x:string) => (x.length > 0 ? `${x}, ` : "");
 
+const con = parsed.filter((x: any) => x.type === "constructor")[0];
+if (con) {
+  const conInputs = con.inputs.map((y: any) => y.type);
+  
+  console.log(
+`    void deploy(${argTypes(conInputs)}, std::shared_ptr<Web3::CallOptions> options = nullptr) {
+        Web3::Contract::deploy(options, ${argLister(conInputs.length)});
+    }`);
+} else {
+  // Even if we don't have a constructor in the abi we will still generate a deploy function
+  console.log(
+`    void deploy(std::shared_ptr<Web3::CallOptions> options = nullptr) {
+        Web3::Contract::deploy(options);
+    }`);  
+}
+
 parsed.filter((x: any) => x.type === "function").forEach((x: any) => {
   const name = x.name;
   const inputs = x.inputs.map((y: any) => y.type);
   const outputs = x.outputs.map((y: any) => y.type as string);
   const mut = x.stateMutability;
   const signature = `${name}(${inputs.join(",")})`;
-  const builder = indent(`inline auto ${name}(${argTypes(inputs)}) ${body(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
-  const builder_async = indent(`template <typename F> void ${name}_async(${comma(argTypes(inputs))}F &&func) ${body_async(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
+  const builder = indent(`inline auto ${name}(${comma(argTypes(inputs))}std::shared_ptr<Web3::CallOptions> options = nullptr) ${body(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
+  const builder_async = indent(`template <typename F> void ${name}_async(${comma(argTypes(inputs))}F &&func, std::shared_ptr<Web3::CallOptions> options = nullptr) ${body_async(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
   console.log(builder);
   console.log(builder_async);
 });

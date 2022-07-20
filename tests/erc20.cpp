@@ -3,10 +3,24 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <shared_mutex>
+
 BOOST_AUTO_TEST_CASE(Erc20, *boost::unit_test::depends_on("ContextInit")) {
     Erc20_test erc20_test;
     erc20_test.deploy("Something", "SMT");
     BOOST_CHECK(erc20_test.decimals() == 18);
     BOOST_CHECK(erc20_test.name() == "Something");
     BOOST_CHECK(erc20_test.symbol() == "SMT");
+
+    std::shared_timed_mutex testMutex;
+    size_t decimals;
+
+    testMutex.lock();
+    erc20_test.decimals_async([&decimals, &testMutex](const boost::multiprecision::uint256_t &value) {
+        decimals = value.convert_to<size_t>();
+        testMutex.unlock();
+    });
+
+    BOOST_CHECK(testMutex.try_lock_until(std::chrono::system_clock::now() + std::chrono::seconds(5)));
+    BOOST_CHECK(decimals == 18);
 }

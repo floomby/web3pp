@@ -345,6 +345,16 @@ class Account {
         }
         return std::stoul(value_to<std::string>(results.at("result")), nullptr, 16);
     }
+
+    template <typename F>
+    void getTransactionCount_async(F &&func) const {
+        auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");
+        auto handler = [func = std::move(func)](boost::json::value &&results) {
+            func(std::stoul(value_to<std::string>(results.at("result")), nullptr, 16));
+        };
+        std::make_shared<Web3::Net::AsyncRPC<decltype(handler), true>>(context, std::move(str))->call();
+    }
+
     Address deployedContract(size_t nonce) const {
         auto tmp = keccak256_v(Encoder::RLPEncode(this->address, nonce));
         tmp.erase(tmp.begin(), tmp.begin() + 12);

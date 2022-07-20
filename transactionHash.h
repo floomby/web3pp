@@ -19,7 +19,7 @@ struct TransactionHash {
         if (results.as_object().contains("error")) {
             throw std::runtime_error("Unable to get transaction receipt: " + value_to<std::string>(results.at("error").at("message")));
         }
-        std::cout << "Receipt: " << results.at("result") << std::endl;
+        // std::cout << "Receipt: " << results.at("result") << std::endl;
     }
 };
 }

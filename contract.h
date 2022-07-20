@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "account.h"
+#include "callOptions.h"
 #include "ethereum.h"
 #include "transaction.h"
 #include "units.h"
@@ -29,29 +30,56 @@ template <typename F, typename... Ts> struct CallWrapper {
 // TODO deploy should not be a template because that defeats the purpose of having this static typing
 class Contract {
    protected:
+    template<typename...Ts> void deploy(std::shared_ptr<CallOptions> options, Ts... args) {
+        // TODO find gas price and estimate gas
+        auto encoded = Web3::Encoder::ABIEncode(args...);
+        std::string data = __data() + toString(encoded);
+        boost::multiprecision::uint256_t txGas;
+        size_t nonce;
+        if (options && options->nonce) {
+            nonce = *options->nonce;
+        } else {
+            nonce = context->signers.front()->getTransactionCount();
+        }
+        if (options && options->gasLimit) {
+            txGas = *options->gasLimit;
+        } else {
+            auto gas = this->estimateGas(context->signers.front()->address, "0", data.c_str());
+            boost::multiprecision::cpp_dec_float_50 gasF = fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
+            txGas = gasF.convert_to<boost::multiprecision::uint256_t>();
+        }
+        boost::multiprecision::uint256_t txPrice;
+        if (options && options->gasPrice) {
+            txPrice = *options->gasPrice;
+        } else {
+            txPrice = Units::gwei(30);
+        }
+        boost::multiprecision::uint256_t txValue;
+        if (options && options->value) {
+            txValue = *options->value;
+        } else {
+            txValue = 0;
+        }
+        Web3::Transaction tx{nonce, txPrice, txGas, std::vector<unsigned char>({}), txValue, Web3::hexToBytes(data.c_str())};
+        std::shared_ptr<Account> signer;
+        if (options && options->account) {
+            signer = options->account;
+        } else {
+            if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
+            signer = context->signers.front();
+        }
+        auto signedTx = tx.sign(*signer);
+        auto h = Ethereum::sendRawTransaction(Web3::toString(signedTx));
+        std::cout << "Hash: " << h << std::endl;
+        address = signer->deployedContract(nonce);
+        h.getReceipt();
+    }
     const boost::multiprecision::cpp_dec_float_50 gasMult = boost::multiprecision::cpp_dec_float_50(1.2);
     std::shared_ptr<Context> context;
 
    public:
     virtual const char *__data() = 0;
     Address address;
-    template<typename...Ts> void deploy(Ts... args) {
-        if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
-        // TODO find gas price and estimate gas
-        auto encoded = Web3::Encoder::ABIEncode(args...);
-        std::string data = __data() + toString(encoded);
-        auto gas = this->estimateGas(context->signers.front()->address, "0", data.c_str());
-        const auto nonce = context->signers.front()->getTransactionCount();
-        boost::multiprecision::cpp_dec_float_50 gasF = fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
-        Web3::Transaction tx{nonce, Units::gwei(30), gasF.convert_to<boost::multiprecision::uint256_t>(), std::vector<unsigned char>({}),
-            Web3::fromString("00"), Web3::hexToBytes(data.c_str())};
-
-        auto signedTx = tx.sign(*context->signers.front());
-        auto h = Ethereum::sendRawTransaction(Web3::toString(signedTx));
-        std::cout << "Hash: " << h << std::endl;
-        address = context->signers.front()->deployedContract(nonce);
-        h.getReceipt();
-    }
     Contract(std::shared_ptr<Context> context) : context(context) {
         if (!context) throw std::runtime_error("Contract construction requires valid context");
     }
@@ -80,6 +108,9 @@ class Contract {
         }
         return value_to<std::string>(results.at("result"));
     }
+    std::string estimateGas(Address from, const char *value, const std::vector<unsigned char> &data, Address to = Address{}) {
+        return estimateGas(from, value, toString(data).c_str(), to);
+    }
     template <typename F>
     void estimateGas_async(F &&func, Address from, const char *value = "", const char *data = "", Address to = Address{}) {
         std::vector<std::pair<std::string, std::string>> args;
@@ -105,8 +136,12 @@ class Contract {
         try {
             std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
         } catch (const std::exception &e) {
-            throw std::runtime_error("Unable to estimate gas: " + std::string(e.what()));
+            std::clog << "Unable to estimate gas: " + std::string(e.what()) << std::endl;
         }
+    }
+    template <typename F>
+    void estimateGas_async(F &&func, Address from, const char *value, const std::vector<unsigned char> &data, Address to = Address{}) {
+        estimateGas_async(std::move(func), from, value, toString(data).c_str(), to);
     }
 };
 

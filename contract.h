@@ -25,6 +25,8 @@ template <typename F, typename... Ts> struct CallWrapper {
     };
 };
 
+// TODO We should have deploy_async 
+// TODO deploy should not be a template because that defeats the purpose of having this static typing
 class Contract {
    protected:
     const boost::multiprecision::cpp_dec_float_50 gasMult = boost::multiprecision::cpp_dec_float_50(1.2);

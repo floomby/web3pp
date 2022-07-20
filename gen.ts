@@ -3,7 +3,7 @@ import assert from "assert";
 import keccak256 from "keccak256";
 
 const abi = fs.readFileSync(process.argv[2] + ".abi", "utf8");
-const bin = fs.readFileSync(process.argv[2] + ".bin", "utf8").trim();
+const bin = fs.readFileSync(process.argv[2] + ".bin", "utf8").trim().replace(/^0x/, "");
 const parsed = JSON.parse(abi);
 
 const retType = (t: string) => {

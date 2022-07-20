@@ -23,13 +23,10 @@ struct Fixed : FixedBase {
         return (underlying * boost::multiprecision::pow(boost::multiprecision::cpp_dec_float_100(10), N)).convert_to<typename Signedness<isSigned>::type>();
     }
     template <typename T>
-    Fixed(const T &value) {
-        if constexpr (std::is_same_v<T, typename Signedness<isSigned>::type>) {
-            underlying = boost::multiprecision::cpp_dec_float_100(10);
-            // underlying = value;
-            // underlying /= boost::multiprecision::pow(boost::multiprecision::cpp_int(10), N).convert_to<boost::multiprecision::cpp_dec_float_100>();
-        } else {
-            underlying = boost::multiprecision::cpp_dec_float_100(5.4);
+    Fixed(const T &value, bool fromAbi = false) {
+        underlying = boost::multiprecision::cpp_dec_float_100(value);
+        if (fromAbi) {
+            underlying /= boost::multiprecision::pow(boost::multiprecision::cpp_int(10), N).convert_to<boost::multiprecision::cpp_dec_float_100>();
         }
     }
 };
@@ -315,7 +312,7 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std:
         return ret;
     // fixed type
     } else if constexpr (is_fixed<T>::value) {
-        return T(ABIDecodeTo<decltype(std::declval<T>().abiEncodable())>(data, it));
+        return T(ABIDecodeTo<decltype(std::declval<T>().abiEncodable())>(data, it), true);
     } else {
         static_assert(always_false<T>, "Unsupported type");
     }

@@ -8,7 +8,6 @@ This library depends only on some boost libraries and openssl.
 
 ### Things to finish
 
-* Troubleshoot fixed point returns from rpc (I don't think this is my problem)
 * Call options (value, gas override, gas price, alternative signer)
 * Work on library consistency
 * Documentation

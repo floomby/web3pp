@@ -77,7 +77,7 @@ template <typename T, size_t Idx>
 bool constexpr is_dynamic_t() {
     static_assert(is_std_tuple<T>::value, "T must be a std::tuple");
     if constexpr (Idx == 0) {
-        return false;
+        return is_dynamic<typename get_tuple_type<Idx, T>::type>();
     } else {
         return is_dynamic<typename get_tuple_type<Idx, T>::type>() || is_dynamic_t<T, Idx - 1>();
     }
@@ -230,7 +230,7 @@ template <typename T, size_t N> auto ABIDecodeTuple(const std::vector<unsigned c
         if constexpr (N == 0) {
             return std::make_tuple(tmp);
         } else {
-            return std::tuple_cat(ABIDecodeTuple<T, N - 1>(data, it, start), std::make_tuple(tmp));
+            return std::tuple_cat(std::make_tuple(tmp), ABIDecodeTuple<T, N - 1>(data, it, start));
         }
     }
 }
@@ -238,7 +238,6 @@ template <typename T, size_t N> auto ABIDecodeTuple(const std::vector<unsigned c
 template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std::vector<unsigned char>::const_iterator &it) {
     if constexpr (std::is_same_v<T, boost::multiprecision::uint256_t>) {
         if (it == data.end()) {
-            std::clog << "Bad buffer is: " << toString(data) << std::endl;
             throw std::runtime_error("Insufficent data");
         }
         auto ret = fromBytes(it);
@@ -246,7 +245,6 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std:
         return ret;
     } else if constexpr (std::is_unsigned_v<T>) {
         if (it == data.end()) {
-            std::clog << "Bad buffer is: " << toString(data) << std::endl;
             throw std::runtime_error("Insufficent data");
         }
         auto ret = static_cast<T>(fromBytes(it));
@@ -254,7 +252,6 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std:
         return ret;
     } else if constexpr (std::is_same_v<T, boost::multiprecision::int256_t>) {
         if (it == data.end()) {
-            std::clog << "Bad buffer is: " << toString(data) << std::endl;
             throw std::runtime_error("Insufficent data");
         }
         auto ret = fromBytes<true>(it);
@@ -262,7 +259,6 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std:
         return ret;
     } else if constexpr (std::is_signed_v<T>) {
         if (it == data.end()) {
-            std::clog << "Bad buffer is: " << toString(data) << std::endl;
             throw std::runtime_error("Insufficent data");
         }
         auto ret = static_cast<T>(fromBytes<true>(it));
@@ -295,9 +291,10 @@ template <typename T> T ABIDecodeTo(const std::vector<unsigned char> &data, std:
             }
             return ret;
         }
-    // string type
+    // tuple type
     } else if constexpr (is_std_tuple<T>::value) {
         return ABIDecodeTuple<T, std::tuple_size_v<T> - 1>(data, it);
+    // string type
     } else if constexpr (std::is_same_v<T, std::string>) {
         auto len = ABIDecodeTo<size_t>(data, it);
         std::string ret;
@@ -328,6 +325,23 @@ template <typename... Ts> auto ABIDecodeTo(const std::vector<unsigned char> &dat
     } else if constexpr (sizeof...(Ts) == 1) {
         return ABIDecodeTo<Ts...>(data, it);
     } else return ABIDecodeTo<std::tuple<Ts...>>(data, it);
+}
+
+template <bool IsTuple, typename... Ts> auto ABIDecodeTo(const std::vector<unsigned char> &data) {
+    if (data.size() % 32 != 0) {
+        throw std::runtime_error("Invalid decode data size");
+    }
+    auto it = data.begin();
+    if constexpr (IsTuple) {
+        auto ret = ABIDecodeTo<std::tuple<Ts...>>(data, it);
+        if constexpr (sizeof...(Ts) == 0) {
+            static_assert(always_false<Ts...>, "No type to decode");
+        } else if constexpr (sizeof...(Ts) == 1) {
+            return std::get<0>(ret);
+        } else return ret;
+    } else {
+        return ABIDecodeTo<Ts...>(data, it);
+    }
 }
 
 }  // namespace Encoder

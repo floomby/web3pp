@@ -32,7 +32,7 @@ const retType = (t: string) => {
     }
     const m = match[3] || "128";
     const n = match[4] || "18";
-    return `${tp}${m},${n}>`;
+    return `${tp} ${m}, ${n}>`;
   } else {
     throw new Error(`Unsupported type: ${t}`);
   }
@@ -64,7 +64,7 @@ const argType = (t: string) => {
     }
     const m = match[3] || "128";
     const n = match[4] || "18";
-    return `const ${tp}${m},${n}> &`;
+    return `const ${tp} ${m}, ${n}> &`;
   } else {
     throw new Error(`Unsupported type: ${t}`);
   }
@@ -123,7 +123,7 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
         throw std::runtime_error("Unable to call function (${name}): " + value_to<std::string>(results.at("error").at("message")));
     }
     auto bytes = Web3::hexToBytes(value_to<std::string>(results.at("result")));
-    return Web3::Encoder::ABIDecodeTo<${outputs.map(retType).join(", ")}>(bytes);`;
+    return Web3::Encoder::ABIDecodeTo<true, ${outputs.map(retType).join(", ")}>(bytes);`;
 }
 
 const caller_async = (tx: boolean, name: string, outputs: string[]) => {

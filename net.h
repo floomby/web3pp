@@ -96,8 +96,8 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
 };
 
 // TODO Add ssl to this
-template <typename F, bool parseResult = false>
-class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F>>, RPCRequest {
+template <typename F, bool ParseResult = false>
+class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, RPCRequest {
     F func;
     std::unique_ptr<boost::beast::tcp_stream> stream;
     std::unique_ptr<boost::beast::ssl_stream<boost::beast::tcp_stream>> sslStream;
@@ -166,7 +166,7 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F>>, RPCRequest {
         if (ec) return fail(ec, "read");
 
         // std::clog << "Body: " << res_.body() << std::endl;
-        if constexpr (parseResult) {
+        if constexpr (ParseResult) {
             try {
                 func(boost::json::parse(res_.body()));
             } catch (const std::exception &e) {

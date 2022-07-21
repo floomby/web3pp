@@ -1,3 +1,6 @@
+// Well now this is a bit of a mess
+// I should have designed it before just coding it like a monkey
+
 import fs from "fs";
 import assert from "assert";
 import keccak256 from "keccak256";
@@ -98,7 +101,7 @@ const fm = (x: string) => `    ${x}\n`;
 
 const caller = (tx: boolean, name: string, outputs: string[]) => {
   return tx ? `
-    boost::multiprecision::uint256_t txGas;
+    boost::multiprecision::uint256_t gasLimit;
     size_t nonce;
     if (options && options->nonce) {
         nonce = *options->nonce;
@@ -106,17 +109,17 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
         nonce = context->signers.front()->getTransactionCount();
     }
     if (options && options->gasLimit) {
-        txGas = *options->gasLimit;
+        gasLimit = *options->gasLimit;
     } else {
         auto gas = this->estimateGas(context->signers.front()->address, "0", encoded);
         boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
-        txGas = gasF.convert_to<boost::multiprecision::uint256_t>();
+        gasLimit = gasF.convert_to<boost::multiprecision::uint256_t>();
     }
-    boost::multiprecision::uint256_t txPrice;
+    boost::multiprecision::uint256_t gasPrice;
     if (options && options->gasPrice) {
-        txPrice = *options->gasPrice;
+        gasPrice = *options->gasPrice;
     } else {
-        txPrice = Web3::Units::gwei(30);
+        gasPrice = Web3::Units::gwei(30);
     }
     boost::multiprecision::uint256_t txValue;
     if (options && options->value) {
@@ -124,7 +127,7 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
     } else {
         txValue = 0;
     }
-    Web3::Transaction tx{nonce, txPrice, txGas, std::vector<unsigned char>({}), txValue, encoded};
+    Web3::Transaction tx{nonce, gasPrice, gasLimit, {}, txValue, encoded};
     std::shared_ptr<Web3::Account> signer;
     if (options && options->account) {
         signer = options->account;
@@ -177,47 +180,38 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
     } else {
         txValue = 0;
     }
-    boost::multiprecision::uint256_t txPrice;
+    boost::multiprecision::uint256_t gasPrice;
     if (options && options->gasPrice) {
-        txPrice = *options->gasPrice;
+        gasPrice = *options->gasPrice;
     } else {
-        txPrice = Web3::Units::gwei(30);
+        gasPrice = Web3::Units::gwei(30);
     }
-    
-    // auto rawSender = [this, encoded, signer, txValue, txPrice, func = std::move(func)](size_t nonce, boost::multiprecision::uint256_t &&gasLimit) {
-    //     Web3::Transaction tx{nonce, txPrice, txGas, std::vector<unsigned char>({}), txValue, encoded};
-    //     auto signedTx = tx.sign(*signer);
-    //     auto str = context->buildRPCJson("eth_sendRawTransaction", "[\\"0x" + tx + "\\"]");
-    //     std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(this->context, std::move(handler), std::move(str))->call();
-    // };
-    
-    // size_t nonce;
-    // if (options && options->nonce) {
-    //     nonce = *options->nonce;
-    // } else {
-    //     nonce = signer->getTransactionCount_async(std::move(gasGetter));
-    // }
-
-
-    // boost::multiprecision::uint256_t txGas;
-    // if (options && options->gasLimit) {
-    //     txGas = *options->gasLimit;
-    // } else {
-    //     auto gas = this->estimateGas(context->signers.front()->address, "0", data.c_str());
-    //     boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
-    //     txGas = gasF.convert_to<boost::multiprecision::uint256_t>();
-    // }
-
-
-
-    // auto handler = [this, encoded](const std::string &gas) {
-    //     boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * this->gasMult;
-    //     Web3::Transaction tx{1234, 0x04a817c800, gasF.convert_to<boost::multiprecision::uint256_t>(), address.asVector(), Web3::fromString("00"), encoded};
-    //     auto signedTx = tx.sign(*signer.front());
-    //     std::cout << "Signed transaction: " << Web3::toString(signedTx) << std::endl;
-    // };
-    // estimateGas_async(std::move(handler), signer.front()->address, "0", Web3::toString(encoded).c_str(), address);
-    ` : `
+    std::optional<boost::multiprecision::uint256_t> gasLimit = std::nullopt;
+    if (options && options->gasLimit) {
+        gasLimit = *options->gasLimit;
+    }
+    auto rawSender = [address = this->address, context = this->context, signer, txValue, gasPrice, encoded, func = std::move(func)](size_t nonce, const boost::multiprecision::uint256_t &gasLimit) {
+        Web3::Transaction tx{nonce, gasPrice, gasLimit, address, txValue, encoded};
+        auto signedTx = tx.sign(*signer);
+        auto str = context->buildRPCJson("eth_sendRawTransaction", "[\\"0x" + Web3::toString(signedTx) + "\\"]");
+        std::make_shared<Web3::Net::AsyncRPC<decltype(func), false>>(context, std::move(func), std::move(str))->call();
+    };
+    auto gasGetter = [address = this->address, context = this->context, gasMult = this->gasMult, signer, txValue, gasPrice, gasLimit, encoded, rawSender](size_t nonce) {
+        if (gasLimit) {
+            rawSender(nonce, *gasLimit);
+        } else {
+            auto handler = [rawSender, nonce, gasMult](const std::string &gasEstimation) {
+                boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gasEstimation).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
+                rawSender(nonce, gasF.convert_to<boost::multiprecision::uint256_t>());
+            };
+            Web3::Contract::estimateGas_async(std::move(handler), address, Web3::toString(txValue).c_str(), encoded, signer->address, context);
+        }
+    };
+    if (options && options->nonce) {
+        gasGetter(*options->nonce);
+    } else {
+        signer->getTransactionCount_async(std::move(gasGetter));
+    }` : `
     std::shared_ptr<Web3::Account> signer;
     if (options && options->account) {
         signer = options->account;

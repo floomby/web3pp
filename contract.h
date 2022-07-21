@@ -60,7 +60,7 @@ class Contract {
         } else {
             txValue = 0;
         }
-        Web3::Transaction tx{nonce, txPrice, txGas, std::vector<unsigned char>({}), txValue, Web3::hexToBytes(data.c_str())};
+        Web3::Transaction tx{nonce, txPrice, txGas, {}, txValue, Web3::hexToBytes(data.c_str())};
         std::shared_ptr<Account> signer;
         if (options && options->account) {
             signer = options->account;
@@ -111,8 +111,9 @@ class Contract {
     std::string estimateGas(Address from, const char *value, const std::vector<unsigned char> &data, Address to = Address{}) {
         return estimateGas(from, value, toString(data).c_str(), to);
     }
+    // This needs to be static since we are using it in other async code where the object may have been destroyed and we want to avoid dereferencing a bad this pointer
     template <typename F>
-    void estimateGas_async(F &&func, Address from, const char *value = "", const char *data = "", Address to = Address{}) {
+    static void estimateGas_async(F &&func, Address from, const char *value = "", const char *data = "", Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
         std::vector<std::pair<std::string, std::string>> args;
         args.push_back(std::make_pair("from", from.asString()));
         if (strlen(value) > 0) {
@@ -140,8 +141,8 @@ class Contract {
         }
     }
     template <typename F>
-    void estimateGas_async(F &&func, Address from, const char *value, const std::vector<unsigned char> &data, Address to = Address{}) {
-        estimateGas_async(std::move(func), from, value, toString(data).c_str(), to);
+    static void estimateGas_async(F &&func, Address from, const char *value, const std::vector<unsigned char> &data, Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
+        estimateGas_async(std::move(func), from, value, toString(data).c_str(), to, context);
     }
 };
 

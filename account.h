@@ -352,7 +352,7 @@ class Account {
         auto handler = [func = std::move(func)](boost::json::value &&results) {
             func(std::stoul(value_to<std::string>(results.at("result")), nullptr, 16));
         };
-        std::make_shared<Web3::Net::AsyncRPC<decltype(handler), true>>(context, std::move(str))->call();
+        std::make_shared<Web3::Net::AsyncRPC<decltype(handler), true>>(context, std::move(handler), std::move(str))->call();
     }
 
     Address deployedContract(size_t nonce) const {

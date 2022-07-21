@@ -10,7 +10,7 @@ class Transaction {
     size_t nonce;
     boost::multiprecision::uint256_t gasPrice;
     boost::multiprecision::uint256_t gasLimit;
-    std::vector<unsigned char> to;
+    std::optional<Address> to;
     boost::multiprecision::uint256_t value;
     std::vector<unsigned char> data;
     Signature signature;
@@ -18,7 +18,7 @@ class Transaction {
         Encoder::RLPEncodeInput nonce(integralToBytes(this->nonce));
         Encoder::RLPEncodeInput gasPrice(integralToBytes(this->gasPrice));
         Encoder::RLPEncodeInput gasLimit(integralToBytes(this->gasLimit));
-        Encoder::RLPEncodeInput to(this->to);
+        Encoder::RLPEncodeInput to = this->to ? Encoder::RLPEncodeInput(*this->to) : Encoder::RLPEncodeInput(std::vector<unsigned char>());
         Encoder::RLPEncodeInput value(integralToBytes(this->value));
         Encoder::RLPEncodeInput chainId(integralToBytes(context ? context->chainId : defaultContext->chainId));
         Encoder::RLPEncodeInput empty(std::vector<unsigned char>({}));

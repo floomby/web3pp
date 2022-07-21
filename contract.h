@@ -52,7 +52,7 @@ class Contract {
         if (options && options->gasPrice) {
             txPrice = *options->gasPrice;
         } else {
-            txPrice = Units::gwei(30);
+            txPrice = Units::gwei(10);
         }
         boost::multiprecision::uint256_t txValue;
         if (options && options->value) {

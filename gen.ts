@@ -108,10 +108,16 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
     } else {
         nonce = context->signers.front()->getTransactionCount();
     }
+    boost::multiprecision::uint256_t txValue;
+    if (options && options->value) {
+        txValue = *options->value;
+    } else {
+        txValue = 0;
+    }
     if (options && options->gasLimit) {
         gasLimit = *options->gasLimit;
     } else {
-        auto gas = this->estimateGas(context->signers.front()->address, "0", encoded);
+        auto gas = this->estimateGas(context->signers.front()->address, Web3::toString(txValue).c_str(), encoded, this->address);
         boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
         gasLimit = gasF.convert_to<boost::multiprecision::uint256_t>();
     }
@@ -119,15 +125,9 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
     if (options && options->gasPrice) {
         gasPrice = *options->gasPrice;
     } else {
-        gasPrice = Web3::Units::gwei(30);
+        gasPrice = Web3::Units::gwei(10);
     }
-    boost::multiprecision::uint256_t txValue;
-    if (options && options->value) {
-        txValue = *options->value;
-    } else {
-        txValue = 0;
-    }
-    Web3::Transaction tx{nonce, gasPrice, gasLimit, {}, txValue, encoded};
+    Web3::Transaction tx{nonce, gasPrice, gasLimit, this->address, txValue, encoded};
     std::shared_ptr<Web3::Account> signer;
     if (options && options->account) {
         signer = options->account;
@@ -184,7 +184,7 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
     if (options && options->gasPrice) {
         gasPrice = *options->gasPrice;
     } else {
-        gasPrice = Web3::Units::gwei(30);
+        gasPrice = Web3::Units::gwei(10);
     }
     std::optional<boost::multiprecision::uint256_t> gasLimit = std::nullopt;
     if (options && options->gasLimit) {
@@ -204,7 +204,7 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
                 boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gasEstimation).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
                 rawSender(nonce, gasF.convert_to<boost::multiprecision::uint256_t>());
             };
-            Web3::Contract::estimateGas_async(std::move(handler), address, Web3::toString(txValue).c_str(), encoded, signer->address, context);
+            Web3::Contract::estimateGas_async(std::move(handler), signer->address, Web3::toString(txValue).c_str(), encoded, address, context);
         }
     };
     if (options && options->nonce) {

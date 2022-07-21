@@ -24,6 +24,9 @@ BOOST_AUTO_TEST_CASE(Erc20, *boost::unit_test::depends_on("ContextInit")) {
     BOOST_CHECK(testMutex.try_lock_until(std::chrono::system_clock::now() + std::chrono::seconds(5)));
     BOOST_CHECK(decimals == 18);
 
+    erc20_test.approve("0x1af831cf22600979B502f1b73392f41fc4328Dc4", boost::multiprecision::uint256_t{1000000000000000000});
+    std::cout << "Approved :" << erc20_test.allowance(Web3::defaultContext->signers.front()->address, "0x1af831cf22600979B502f1b73392f41fc4328Dc4") << std::endl;
+
     erc20_test.approve_async(Web3::defaultContext->signers.front()->address, boost::multiprecision::uint256_t{1000000000000000000}, [](const std::string &res) {
         std::cout << "Approve callback: " << res << std::endl;
     });

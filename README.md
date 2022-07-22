@@ -29,7 +29,7 @@ This library depends only on some boost libraries and openssl.
 ### Chores
 
 * Get reasonable documentation
-* Fix building tests to not use primitive makefile
+* Fix building tests to not use primitive makefile (I suppose cmake is the best way to do this)
 * Make some examples that are documented
 * Fix style issues
 * Don't throw out of anything in the async code (it ruins the work queue)

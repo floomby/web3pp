@@ -1,14 +1,7 @@
-#define BOOST_TEST_MODULE Web3Tests
 #define BOOST_TEST_DYN_LINK
-#define BOOST_TEST_NO_MAIN
 #include "../encoder.h"
 
 #include <boost/test/unit_test.hpp>
-
-// entry point:
-int main(int argc, char* argv[], char* envp[]) {
-    return boost::unit_test::unit_test_main(&init_unit_test, argc, argv);
-}
 
 BOOST_AUTO_TEST_CASE(Encoder) {
     BOOST_CHECK(Web3::Encoder::encode(std::vector<unsigned char>{0x00, 0x45, 0x02, 0x00}) == "0x00450200");

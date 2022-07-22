@@ -19,7 +19,6 @@ class Account {
     std::shared_ptr<Context> context;
 
    public:
-    bool canSign = false;
     Address address;
 
     Account() = delete;
@@ -31,8 +30,10 @@ class Account {
         }
     }
 
+    explicit Account(const char *privateKey, std::shared_ptr<Context> context = defaultContext) : Account(hexToBytes(privateKey), context) {}
+
     template <typename T>
-    explicit Account(const T &privateKey, std::shared_ptr<Context> context = defaultContext) : context(context), canSign(true) {
+    explicit Account(const T &privateKey, std::shared_ptr<Context> context = defaultContext) : context(context) {
         if (!context) {
             throw std::runtime_error("Context must be initalized");
         }
@@ -110,14 +111,17 @@ class Account {
         return toString(address.bytes);
     }
     boost::multiprecision::uint256_t getBalance() const {
-        // std::string str = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBalance\",\"params\":[\"0x" + getAddress() + "\",\"latest\"],\"id\":5777}";
         auto str = context->buildRPCJson("eth_getBalance", "[\"0x" + getAddress() + "\",\"latest\"]");
         auto results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
         return fromString(value_to<std::string>(results.at("result")));
     }
-    // TODO Not sure all the error handling is correct (I am not experienced with openssl)
+
+    bool canSign() const {
+        return !!this->privateKey;
+    }
+
     Signature sign(const std::array<unsigned char, 32> &hash, bool eip2 = true, unsigned char kNonce = 0, BN_CTX *ctx = NULL) const {
-        if (!canSign) {
+        if (!canSign()) {
             throw std::runtime_error("Account is not able to sign");
         }
 
@@ -140,7 +144,7 @@ class Account {
             throw std::runtime_error("Unable to get private key");
         }
         BN_bn2binpad(priv, toHash.data() + hash.size(), 32);
-        // The probability that a one byte nonce is insufficient to find a valid s is vanishingly small at (1/2)^256.
+        // The probability that a one byte nonce is insufficient to find a valid s is vanishingly small at ~(1/2)^256.
         toHash.push_back(kNonce);
         auto kBytes = keccak256(toHash);
         auto k = BN_bin2bn(kBytes.data(), kBytes.size(), NULL);

@@ -4,14 +4,13 @@ Header only Ethereum interaction library for c++.
 
 This library depends only on some boost libraries and openssl.
 
-**Is still a work in progress.**
+**NOTE: This currently does not compile with clang.**
 
 ### Things to finish
 
-* Async calling (I need more thorough tests)
 * Call options testing (value, gas override, gas price, alternative signer (more or less completed, but missing some tests))
 * Better testing coverage
-* Make deployment not a variadic template so type hinting is available
+* Get reasonable documentation
 
 ### More things I need to finish
 
@@ -28,8 +27,8 @@ This library depends only on some boost libraries and openssl.
 
 ### Chores
 
-* Get reasonable documentation
 * Fix building tests to not use primitive makefile (I suppose cmake is the best way to do this)
 * Make some examples that are documented
 * Fix style issues
 * Don't throw out of anything in the async code (it ruins the work queue)
+* Make it compile under clang (It is throwing up on the template metaprogramming code as it is right now)

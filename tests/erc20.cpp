@@ -19,13 +19,20 @@ BOOST_AUTO_TEST_CASE(Erc20, *boost::unit_test::depends_on("ContextInit")) {
     BOOST_CHECK(erc20_test.name() == "Something");
     BOOST_CHECK(erc20_test.symbol() == "SMT");
 
+    // I am dumb or something because I don't think I should need two syncronization primitives here, but I seem to be having compile ordering problems
+    // It appears the construction of approvedAmount is somehow drifting down below the closures or something (Idk I am lazy to read the assembly, and hate windows gdb suckyness)
     std::binary_semaphore testSemaphore(1);
-
+    std::mutex testMutex;
+    
+    testMutex.lock();
     size_t decimals = 0;
+    boost::multiprecision::uint256_t approvedAmount = 0;
+    testMutex.unlock();
+
     testSemaphore.acquire();
-    erc20_test.decimals_async([&decimals, &testSemaphore](const boost::multiprecision::uint256_t &value) {
+    erc20_test.decimals_async([&decimals, &testSemaphore, &testMutex](const boost::multiprecision::uint256_t &value) {
+        std::lock_guard<std::mutex> lock(testMutex);
         decimals = value.convert_to<size_t>();
-        // std::this_thread::sleep_for(std::chrono::seconds(8));
         testSemaphore.release();
     });
 
@@ -35,8 +42,8 @@ BOOST_AUTO_TEST_CASE(Erc20, *boost::unit_test::depends_on("ContextInit")) {
     erc20_test.approve("0x1af831cf22600979B502f1b73392f41fc4328Dc4", Web3::Units::ether(1));
     BOOST_CHECK(Web3::Units::ether(1) == erc20_test.allowance(Web3::defaultContext->signers.front()->address, "0x1af831cf22600979B502f1b73392f41fc4328Dc4"));
 
-    boost::multiprecision::uint256_t approvedAmount{0};
-    auto handler = [&approvedAmount, &testSemaphore](const boost::multiprecision::uint256_t &value) {
+    auto handler = [&approvedAmount, &testSemaphore, &testMutex](const boost::multiprecision::uint256_t &value) {
+        std::lock_guard<std::mutex> lock(testMutex);
         approvedAmount = value;
         testSemaphore.release();
     };
@@ -47,4 +54,8 @@ BOOST_AUTO_TEST_CASE(Erc20, *boost::unit_test::depends_on("ContextInit")) {
     BOOST_CHECK(testSemaphore.try_acquire_until(std::chrono::system_clock::now() + std::chrono::seconds(6)));
     testSemaphore.release();
     BOOST_CHECK(approvedAmount == Web3::Units::gwei(40));
+
+    auto otherAccount = std::make_shared<Web3::Account>("1a5260e233781932bef86e6a4defc201c61cd0e55258c2ed5e51702401d7e5d6");
+    erc20_test.approve("0x1af831cf22600979B502f1b73392f41fc4328Dc4", Web3::Units::ether(1), {.account = otherAccount});
+    BOOST_CHECK(Web3::Units::ether(1) == erc20_test.allowance(otherAccount->address, "0x1af831cf22600979B502f1b73392f41fc4328Dc4"));
 }

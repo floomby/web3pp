@@ -102,46 +102,46 @@ const fm = (x: string) => `    ${x}\n`;
 const caller = (tx: boolean, name: string, outputs: string[]) => {
   return tx ? `
     boost::multiprecision::uint256_t gasLimit;
-    size_t nonce;
-    if (options && options->nonce) {
-        nonce = *options->nonce;
-    } else {
-        nonce = context->signers.front()->getTransactionCount();
-    }
     boost::multiprecision::uint256_t txValue;
-    if (options && options->value) {
-        txValue = *options->value;
+    if (options.value) {
+        txValue = *options.value;
     } else {
         txValue = 0;
     }
-    if (options && options->gasLimit) {
-        gasLimit = *options->gasLimit;
-    } else {
-        auto gas = this->estimateGas(context->signers.front()->address, Web3::toString(txValue).c_str(), encoded, this->address);
-        boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
-        gasLimit = gasF.convert_to<boost::multiprecision::uint256_t>();
-    }
-    boost::multiprecision::uint256_t gasPrice;
-    if (options && options->gasPrice) {
-        gasPrice = *options->gasPrice;
-    } else {
-        gasPrice = Web3::Units::gwei(10);
-    }
-    Web3::Transaction tx{nonce, gasPrice, gasLimit, this->address, txValue, encoded};
     std::shared_ptr<Web3::Account> signer;
-    if (options && options->account) {
-        signer = options->account;
+    if (options.account) {
+        signer = options.account;
     } else {
         if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
         signer = context->signers.front();
     }
+    size_t nonce;
+    if (options.nonce) {
+        nonce = *options.nonce;
+    } else {
+        nonce = signer->getTransactionCount();
+    }
+    if (options.gasLimit) {
+        gasLimit = *options.gasLimit;
+    } else {
+        auto gas = this->estimateGas(signer->address, Web3::toString(txValue).c_str(), encoded, this->address);
+        boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
+        gasLimit = gasF.convert_to<boost::multiprecision::uint256_t>();
+    }
+    boost::multiprecision::uint256_t gasPrice;
+    if (options.gasPrice) {
+        gasPrice = *options.gasPrice;
+    } else {
+        gasPrice = Web3::Units::gwei(10);
+    }
+    Web3::Transaction tx{nonce, gasPrice, gasLimit, this->address, txValue, encoded};
     auto signedTx = tx.sign(*signer);
     auto h = Web3::Ethereum::sendRawTransaction(Web3::toString(signedTx));
     std::cout << "Hash: " << h << std::endl;
     h.getReceipt();` : `
     std::shared_ptr<Web3::Account> signer;
-    if (options && options->account) {
-        signer = options->account;
+    if (options.account) {
+        signer = options.account;
     } else {
         if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
         signer = context->signers.front();
@@ -168,27 +168,27 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
 const caller_async = (tx: boolean, name: string, outputs: string[]) => {
   return tx ? `
     std::shared_ptr<Web3::Account> signer;
-    if (options && options->account) {
-        signer = options->account;
+    if (options.account) {
+        signer = options.account;
     } else {
         if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
         signer = context->signers.front();
     }
     boost::multiprecision::uint256_t txValue;
-    if (options && options->value) {
-        txValue = *options->value;
+    if (options.value) {
+        txValue = *options.value;
     } else {
         txValue = 0;
     }
     boost::multiprecision::uint256_t gasPrice;
-    if (options && options->gasPrice) {
-        gasPrice = *options->gasPrice;
+    if (options.gasPrice) {
+        gasPrice = *options.gasPrice;
     } else {
         gasPrice = Web3::Units::gwei(10);
     }
     std::optional<boost::multiprecision::uint256_t> gasLimit = std::nullopt;
-    if (options && options->gasLimit) {
-        gasLimit = *options->gasLimit;
+    if (options.gasLimit) {
+        gasLimit = *options.gasLimit;
     }
     auto rawSender = [address = this->address, context = this->context, signer, txValue, gasPrice, encoded, func = std::move(func)](size_t nonce, const boost::multiprecision::uint256_t &gasLimit) {
         Web3::Transaction tx{nonce, gasPrice, gasLimit, address, txValue, encoded};
@@ -207,14 +207,14 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
             Web3::Contract::estimateGas_async(std::move(handler), signer->address, Web3::toString(txValue).c_str(), encoded, address, context);
         }
     };
-    if (options && options->nonce) {
-        gasGetter(*options->nonce);
+    if (options.nonce) {
+        gasGetter(*options.nonce);
     } else {
         signer->getTransactionCount_async(std::move(gasGetter));
     }` : `
     std::shared_ptr<Web3::Account> signer;
-    if (options && options->account) {
-        signer = options->account;
+    if (options.account) {
+        signer = options.account;
     } else {
         if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
         signer = context->signers.front();
@@ -267,13 +267,13 @@ if (con) {
   const conInputs = con.inputs.map((y: any) => y.type);
   
   console.log(
-`    void deploy(${argTypes(conInputs)}, std::shared_ptr<Web3::CallOptions> options = nullptr) {
+`    void deploy(${argTypes(conInputs)}, const Web3::CallOptions &options = {}) {
         Web3::Contract::deploy(options, ${argLister(conInputs.length)});
     }`);
 } else {
   // Even if we don't have a constructor in the abi we will still generate a deploy function
   console.log(
-`    void deploy(std::shared_ptr<Web3::CallOptions> options = nullptr) {
+`    void deploy(const Web3::CallOptions &options = {}) {
         Web3::Contract::deploy(options);
     }`);  
 }
@@ -284,8 +284,8 @@ parsed.filter((x: any) => x.type === "function").forEach((x: any) => {
   const outputs = x.outputs.map((y: any) => y.type as string);
   const mut = x.stateMutability;
   const signature = `${name}(${inputs.join(",")})`;
-  const builder = indent(`inline auto ${name}(${comma(argTypes(inputs))}std::shared_ptr<Web3::CallOptions> options = nullptr) ${body(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
-  const builder_async = indent(`template <typename F> void ${name}_async(${comma(argTypes(inputs))}F &&func, std::shared_ptr<Web3::CallOptions> options = nullptr) ${body_async(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
+  const builder = indent(`inline auto ${name}(${comma(argTypes(inputs))}const Web3::CallOptions &options = {}) ${body(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
+  const builder_async = indent(`template <typename F> void ${name}_async(${comma(argTypes(inputs))}F &&func, const Web3::CallOptions &options = {}) ${body_async(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
   console.log(builder);
   console.log(builder_async);
 });

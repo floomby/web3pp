@@ -10,6 +10,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 
 #ifdef _WIN32
 #include <wincrypt.h>
@@ -43,6 +44,9 @@ namespace Web3 {
 class Account;
 
 struct Context {
+   private:
+    std::shared_ptr<boost::asio::io_service::work> work;
+   public:
     std::string host, port;
     unsigned chainId;
     boost::asio::io_context ioContext;
@@ -73,36 +77,36 @@ struct Context {
 #endif
             sslContext.set_verify_mode(boost::asio::ssl::verify_peer);
         }
+        work = std::make_shared<boost::asio::io_service::work>(ioContext);
     }
     inline std::string hostString() const { return host + ":" + port; }
 
    private:
     inline void runner() {
         try {
-            while (running) {
+            // while (running) {
                 try {
                     ioContext.run();
                 } catch (std::exception &e) {
                     std::cout << "Error: " << e.what() << std::endl;
                 }
-            }
+            // }
         } catch (...) {
             std::exception_ptr p = std::current_exception();
             std::clog << (p ? p.__cxa_exception_type()->name() : "null") << std::endl;
         }
+        std::cout << "Runner thread finished" << std::endl;
     }
 
    public:
     inline void run() {
-        running = true;
-        auto work = std::make_shared<boost::asio::io_service::work>(ioContext);
         runnerThread = std::thread(&Context::runner, this);
     }
     inline std::string buildRPCJson(const std::string &method, const std::string &params) const {
         return "{\"jsonrpc\":\"2.0\",\"id\":" + std::to_string(chainId) + ",\"method\":\"" + method + "\",\"params\":" + params + "}";
     }
     ~Context() {
-        running = false;
+        // work.reset();
         if (crypto.group) EC_GROUP_free(crypto.group);
         if (crypto.pMinusN) BN_free(crypto.pMinusN);
         runnerThread.join();

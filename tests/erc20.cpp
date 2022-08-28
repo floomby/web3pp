@@ -1,16 +1,9 @@
-#define BOOST_TEST_MODULE Web3Tests
 #define BOOST_TEST_DYN_LINK
-#define BOOST_TEST_NO_MAIN
 #include "../erc20-test.h"
 
 #include <boost/test/unit_test.hpp>
 
 #include <semaphore>
-
-// entry point for all the tests
-int main(int argc, char* argv[], char* envp[]) {
-    return boost::unit_test::unit_test_main(&init_unit_test, argc, argv);
-}
 
 BOOST_AUTO_TEST_CASE(Erc20, *boost::unit_test::depends_on("ContextInit")) {
     Erc20_test erc20_test;

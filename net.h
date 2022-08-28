@@ -20,7 +20,7 @@ namespace Web3 {
 namespace Net {
 
 inline void fail(const boost::beast::error_code &ec, char const *what) {
-    std::cerr << what << ": " << ec.message() << std::endl;
+    std::cerr << what << ":> " << ec.message() << std::endl;
 }
 
 class RPCRequest {
@@ -83,7 +83,6 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
 
         boost::beast::http::write(*stream, req_);
         boost::beast::http::read(*stream, buffer_, res_);
-        // std::clog << res_.body() << std::endl;
 
         const char *buf = "{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":\"0x0000000000000000000000000000000000000000000000000000000000000005\"}";
         boost::iostreams::stream<boost::iostreams::array_source> stream2(buf, strlen(buf));
@@ -120,10 +119,15 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
         init();
         if (context_->useSsl) {
             sslStream = std::make_unique<boost::beast::ssl_stream<boost::beast::tcp_stream>>(boost::asio::make_strand(context_->ioContext), context_->sslContext);
+            // if (!SSL_set_tlsext_host_name(sslStream->native_handle(), context_->host.c_str())) {
+            //     boost::beast::error_code ec{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()};
+            //     std::cerr << ec.message() << "\n";
+            //     return;
+            // }
+            std::cout << "Connecting to " << context_->host << ":" << context_->port << std::endl;
             if (!SSL_set_tlsext_host_name(sslStream->native_handle(), context_->host.c_str())) {
                 boost::beast::error_code ec{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()};
-                std::cerr << ec.message() << "\n";
-                return;
+                throw boost::beast::system_error{ec};
             }
         } else {
             stream = std::make_unique<boost::beast::tcp_stream>(boost::asio::make_strand(context->ioContext));
@@ -131,10 +135,8 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void call() {
-        std::clog << "Called" << std::endl;
         if (context_->useSsl) {
             boost::beast::get_lowest_layer(*sslStream).expires_after(std::chrono::seconds(30));
-            std::clog << "Connecting" << std::endl;
             boost::beast::get_lowest_layer(*sslStream).async_connect(context_->endpoints, boost::beast::bind_front_handler(&AsyncRPC::on_connect, this->shared_from_this()));
         } else {
             stream->expires_after(std::chrono::seconds(30));
@@ -143,7 +145,6 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type) {
-        std::clog << "CONNECT" << std::endl;
         if (ec) return fail(ec, "connect");
 
         if (context_->useSsl) {
@@ -156,7 +157,6 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_handshake(boost::beast::error_code ec) {
-        std::clog << "HANDSHAKE" << std::endl;
         if (ec) return fail(ec, "handshake");
 
         boost::beast::get_lowest_layer(*sslStream).expires_after(std::chrono::seconds(30));
@@ -164,7 +164,6 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_write(boost::beast::error_code ec, std::size_t bytes_transferred) {
-        std::clog << "WRITE" << std::endl;
         boost::ignore_unused(bytes_transferred);
 
         if (ec) return fail(ec, "write");
@@ -177,12 +176,10 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_read(boost::beast::error_code ec, std::size_t bytes_transferred) {
-        std::clog << "READ" << std::endl;
         boost::ignore_unused(bytes_transferred);
 
         if (ec) return fail(ec, "read");
 
-        // std::clog << "Body: " << res_.body() << std::endl;
         if constexpr (ParseResult) {
             try {
                 boost::iostreams::stream<boost::iostreams::array_source> is(res_.body().data(), res_.body().size());
@@ -208,7 +205,6 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_shutdown(boost::beast::error_code ec) {
-        std::clog << "SHUTDOWN" << std::endl;
         if (ec) return fail(ec, "shutdown");
     }
 };

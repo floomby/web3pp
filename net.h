@@ -1,11 +1,15 @@
 #pragma once
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/beast/ssl.hpp>
-#include <boost/json.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/iostreams/stream.hpp>
 #include <boost/lexical_cast.hpp>
 #include <iostream>
 
@@ -52,14 +56,17 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
    public:
     inline explicit SyncRPC(std::shared_ptr<Context> context, std::string &&rpcJson) : RPCRequest(context, std::move(rpcJson)) {}
 
-    inline boost::json::value call() {
+    inline boost::property_tree::ptree call() {
         if (!context_->useSsl) {
             boost::asio::ip::tcp::socket socket(context_->ioContext);
             boost::asio::connect(socket, context_->endpoints.begin(), context_->endpoints.end());
 
             boost::beast::http::write(socket, req_);
             boost::beast::http::read(socket, buffer_, res_);
-            return boost::json::parse(res_.body());
+            boost::iostreams::stream<boost::iostreams::array_source> stream(res_.body().c_str(), res_.body().size());
+            boost::property_tree::ptree results;
+            boost::property_tree::read_json(stream, results);
+            return results;
         }
 
         auto stream = std::make_shared<boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>(context_->ioContext, context_->sslContext);
@@ -76,8 +83,12 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
 
         boost::beast::http::write(*stream, req_);
         boost::beast::http::read(*stream, buffer_, res_);
-        std::cout << res_.body() << std::endl;
-        auto ret = boost::json::parse("{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":\"0x0000000000000000000000000000000000000000000000000000000000000005\"}");
+        // std::clog << res_.body() << std::endl;
+
+        const char *buf = "{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":\"0x0000000000000000000000000000000000000000000000000000000000000005\"}";
+        boost::iostreams::stream<boost::iostreams::array_source> stream2(buf, strlen(buf));
+        boost::property_tree::ptree results;
+        boost::property_tree::read_json(stream2, results);
 
         // Idk the right way to do this?? Need to pull wireshark out to figure this out I think
         stream->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both);
@@ -91,7 +102,7 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
         //         }
         // });
 
-        return ret;
+        return results;
     }
 };
 
@@ -120,8 +131,10 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void call() {
+        std::clog << "Called" << std::endl;
         if (context_->useSsl) {
             boost::beast::get_lowest_layer(*sslStream).expires_after(std::chrono::seconds(30));
+            std::clog << "Connecting" << std::endl;
             boost::beast::get_lowest_layer(*sslStream).async_connect(context_->endpoints, boost::beast::bind_front_handler(&AsyncRPC::on_connect, this->shared_from_this()));
         } else {
             stream->expires_after(std::chrono::seconds(30));
@@ -130,6 +143,7 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type) {
+        std::clog << "CONNECT" << std::endl;
         if (ec) return fail(ec, "connect");
 
         if (context_->useSsl) {
@@ -142,6 +156,7 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_handshake(boost::beast::error_code ec) {
+        std::clog << "HANDSHAKE" << std::endl;
         if (ec) return fail(ec, "handshake");
 
         boost::beast::get_lowest_layer(*sslStream).expires_after(std::chrono::seconds(30));
@@ -149,6 +164,7 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_write(boost::beast::error_code ec, std::size_t bytes_transferred) {
+        std::clog << "WRITE" << std::endl;
         boost::ignore_unused(bytes_transferred);
 
         if (ec) return fail(ec, "write");
@@ -161,6 +177,7 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_read(boost::beast::error_code ec, std::size_t bytes_transferred) {
+        std::clog << "READ" << std::endl;
         boost::ignore_unused(bytes_transferred);
 
         if (ec) return fail(ec, "read");
@@ -168,7 +185,10 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
         // std::clog << "Body: " << res_.body() << std::endl;
         if constexpr (ParseResult) {
             try {
-                func(boost::json::parse(res_.body()));
+                boost::iostreams::stream<boost::iostreams::array_source> is(res_.body().data(), res_.body().size());
+                boost::property_tree::ptree pt;
+                boost::property_tree::read_json(is, pt);
+                func(std::move(pt));
             } catch (const std::exception &e) {
                 std::cerr << "Error running async callback: " << e.what() << std::endl;
             }
@@ -188,6 +208,7 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_shutdown(boost::beast::error_code ec) {
+        std::clog << "SHUTDOWN" << std::endl;
         if (ec) return fail(ec, "shutdown");
     }
 };

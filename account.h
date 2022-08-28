@@ -113,7 +113,7 @@ class Account {
     boost::multiprecision::uint256_t getBalance() const {
         auto str = context->buildRPCJson("eth_getBalance", "[\"0x" + getAddress() + "\",\"latest\"]");
         auto results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
-        return fromString(value_to<std::string>(results.at("result")));
+        return fromString(results.get<std::string>("result"));
     }
 
     bool canSign() const {
@@ -338,23 +338,23 @@ class Account {
     
     size_t getTransactionCount() const {
         auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");
-        boost::json::value results;
+        boost::property_tree::ptree results;
         try {
             results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
         } catch (const std::exception &e) {
             throw std::runtime_error("Unable to get transaction count: " + std::string(e.what()));
         }
-        if (results.as_object().contains("error")) {
-            throw std::runtime_error("Unable to get transaction count: " + value_to<std::string>(results.at("error").at("message")));
+        if (results.get_child_optional( "error")) {
+            throw std::runtime_error("Unable to get transaction count: " + results.get<std::string>("error.message"));
         }
-        return std::stoul(value_to<std::string>(results.at("result")), nullptr, 16);
+        return std::stoul(results.get<std::string>("result"), nullptr, 16);
     }
 
     template <typename F>
     void getTransactionCount_async(F &&func) const {
         auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");
-        auto handler = [func = std::move(func)](boost::json::value &&results) {
-            func(std::stoul(value_to<std::string>(results.at("result")), nullptr, 16));
+        auto handler = [func = std::move(func)](boost::property_tree::ptree &&results) {
+            func(std::stoul(results.get<std::string>("result"), nullptr, 16));
         };
         std::make_shared<Web3::Net::AsyncRPC<decltype(handler), true>>(context, std::move(handler), std::move(str))->call();
     }

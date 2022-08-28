@@ -10,14 +10,14 @@ struct TransactionHash {
     std::string hash;
     void getReceipt() {
         auto str = context->buildRPCJson("eth_getTransactionReceipt", "[\"" + hash + "\"]");
-        boost::json::value results;
+        boost::property_tree::ptree results;
         try {
             results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
         } catch (const std::exception &e) {
             throw std::runtime_error("Unable to get transaction receipt: " + std::string(e.what()));
         }
-        if (results.as_object().contains("error")) {
-            throw std::runtime_error("Unable to get transaction receipt: " + value_to<std::string>(results.at("error").at("message")));
+        if (results.get_child_optional( "error")) {
+            throw std::runtime_error("Unable to get transaction receipt: " + results.get<std::string>("error.message"));
         }
         // std::cout << "Receipt: " << results.at("result") << std::endl;
     }

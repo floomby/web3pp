@@ -1,6 +1,9 @@
 #pragma once
 
-#include <boost/json.hpp>
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
@@ -21,6 +24,16 @@
 template <class... T> constexpr bool always_false = false;
 
 namespace Web3 {
+
+template<std::integral T>
+constexpr T byteswap(T value) noexcept
+{
+    static_assert(std::has_unique_object_representations_v<T>, 
+                  "T may not have padding bits");
+    auto value_representation = std::bit_cast<std::array<std::byte, sizeof(T)>>(value);
+    std::ranges::reverse(value_representation);
+    return std::bit_cast<T>(value_representation);
+}
 
 template <bool isSigned> struct Signedness {};
 template <> struct Signedness<true> { typedef boost::multiprecision::int256_t type; };
@@ -191,94 +204,85 @@ template <typename T = std::vector<unsigned char>> T hexToBytes(const std::strin
     return bytes;
 }
 
-inline boost::json::value parseFile(const std::string &filename) {
-    std::ifstream ifs(filename);
-    if (!ifs.is_open()) {
-        throw std::runtime_error("Could not open file");
-    }
-    std::stringstream ss;
-    ss << ifs.rdbuf();
-    return boost::json::parse(ss.str());
-}
+// TODO make a version of this for property tree (there may already be one)
+// inline void prettyPrint(std::ostream &os, boost::property_tree::ptree const &jv, std::string *indent = nullptr) {
+//     std::string indent_;
+//     if (!indent)
+//         indent = &indent_;
+//     switch (jv.kind()) {
+//         case boost::json::kind::object: {
+//             os << "{\n";
+//             indent->append(4, ' ');
+//             auto const &obj = jv.get_object();
+//             if (!obj.empty()) {
+//                 auto it = obj.begin();
+//                 for (;;) {
+//                     os << *indent << boost::json::serialize(it->key()) << " : ";
+//                     prettyPrint(os, it->value(), indent);
+//                     if (++it == obj.end())
+//                         break;
+//                     os << ",\n";
+//                 }
+//             }
+//             os << "\n";
+//             indent->resize(indent->size() - 4);
+//             os << *indent << "}";
+//             break;
+//         }
 
-inline void prettyPrint(std::ostream &os, boost::json::value const &jv, std::string *indent = nullptr) {
-    std::string indent_;
-    if (!indent)
-        indent = &indent_;
-    switch (jv.kind()) {
-        case boost::json::kind::object: {
-            os << "{\n";
-            indent->append(4, ' ');
-            auto const &obj = jv.get_object();
-            if (!obj.empty()) {
-                auto it = obj.begin();
-                for (;;) {
-                    os << *indent << boost::json::serialize(it->key()) << " : ";
-                    prettyPrint(os, it->value(), indent);
-                    if (++it == obj.end())
-                        break;
-                    os << ",\n";
-                }
-            }
-            os << "\n";
-            indent->resize(indent->size() - 4);
-            os << *indent << "}";
-            break;
-        }
+//         case boost::json::kind::array: {
+//             os << "[\n";
+//             indent->append(4, ' ');
+//             auto const &arr = jv.get_array();
+//             if (!arr.empty()) {
+//                 auto it = arr.begin();
+//                 for (;;) {
+//                     os << *indent;
+//                     prettyPrint(os, *it, indent);
+//                     if (++it == arr.end())
+//                         break;
+//                     os << ",\n";
 
-        case boost::json::kind::array: {
-            os << "[\n";
-            indent->append(4, ' ');
-            auto const &arr = jv.get_array();
-            if (!arr.empty()) {
-                auto it = arr.begin();
-                for (;;) {
-                    os << *indent;
-                    prettyPrint(os, *it, indent);
-                    if (++it == arr.end())
-                        break;
-                    os << ",\n";
+//                 }
+//             }
+//             os << "\n";
+//             indent->resize(indent->size() - 4);
+//             os << *indent << "]";
+//             break;
+//         }
 
-                }
-            }
-            os << "\n";
-            indent->resize(indent->size() - 4);
-            os << *indent << "]";
-            break;
-        }
+//         case boost::json::kind::string: {
+//             os << boost::json::serialize(jv.get_string());
+//             break;
+//         }
 
-        case boost::json::kind::string: {
-            os << boost::json::serialize(jv.get_string());
-            break;
-        }
+//         case boost::json::kind::uint64:
+//             os << jv.get_uint64();
+//             break;
 
-        case boost::json::kind::uint64:
-            os << jv.get_uint64();
-            break;
+//         case boost::json::kind::int64:
+//             os << jv.get_int64();
+//             break;
 
-        case boost::json::kind::int64:
-            os << jv.get_int64();
-            break;
+//         case boost::json::kind::double_:
+//             os << jv.get_double();
+//             break;
 
-        case boost::json::kind::double_:
-            os << jv.get_double();
-            break;
+//         case boost::json::kind::bool_:
+//             if (jv.get_bool())
+//                 os << "true";
+//             else
+//                 os << "false";
+//             break;
 
-        case boost::json::kind::bool_:
-            if (jv.get_bool())
-                os << "true";
-            else
-                os << "false";
-            break;
+//         case boost::json::kind::null:
+//             os << "null";
+//             break;
+//     }
 
-        case boost::json::kind::null:
-            os << "null";
-            break;
-    }
-
-    if (indent->empty())
-        os << "\n";
-}
+//     if (indent->empty())
+//         os << "\n";
+// }
 
 inline std::vector<unsigned char> integralToBytes(const boost::multiprecision::uint256_t &val) {
     std::vector<unsigned char> ret;
@@ -304,7 +308,7 @@ template <typename T> std::vector<unsigned char> integralToBytes(T val) {
     static_assert(std::is_integral<T>::value, "T must be integral");
     std::vector<unsigned char> bytes;
     if constexpr (std::endian::native == std::endian::big) {
-        val = std::byteswap(val);
+        val = byteswap(val);
     }
     // right shift on signed is implementation dependant as to whether it is logical or integral
     auto asUnsigned = static_cast<std::make_unsigned<T>::type>(val);

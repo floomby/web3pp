@@ -151,16 +151,16 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
         {"to", address.asString()},
         {"data", "0x" + Web3::toString(encoded)}
     }) + ",\\"latest\\"]");
-    boost::json::value results;
+    boost::property_tree::ptree results;
     try {
         results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
     } catch (const std::exception &e) {
         throw std::runtime_error("Unable to call function (${name}): " + std::string(e.what()));
     }
-    if (results.as_object().contains("error")) {
-        throw std::runtime_error("Unable to call function (${name}): " + value_to<std::string>(results.at("error").at("message")));
+    if (results.get_child_optional( "error")) {
+        throw std::runtime_error("Unable to call function (${name}): " + results.get<std::string>("error.message"));
     }
-    auto bytes = Web3::hexToBytes(value_to<std::string>(results.at("result")));
+    auto bytes = Web3::hexToBytes(results.get<std::string>("result"));
     return Web3::Encoder::ABIDecodeTo<true, ${outputs.map(retType).join(", ")}>(bytes);`;
 }
 

@@ -16,11 +16,13 @@ template <typename F, typename... Ts> struct CallWrapper {
     F f;
     CallWrapper(F &&f, std::string &&name) : name(std::move(name)), f(std::move(f)) {}
     void operator()(const std::string &str){ 
-        auto results = boost::json::parse(str);
-        if (results.as_object().contains("error")) {
-            std::clog << "Unable to call function (" + name + "): " + value_to<std::string>(results.at("error").at("message")) + "\\n";
+        boost::iostreams::stream<boost::iostreams::array_source> stream(str.c_str(), str.size());
+        boost::property_tree::ptree results;
+        boost::property_tree::read_json(stream, results);
+        if (results.get_child_optional( "error")) {
+            std::clog << "Unable to call function (" + name + "): " + results.get<std::string>("error.message") + "\\n";
         }
-        auto bytes = Web3::hexToBytes(value_to<std::string>(results.at("result")));
+        auto bytes = Web3::hexToBytes(results.get<std::string>("result"));
         // std::cout << "Result: " << toString(bytes) << std::endl;
         f(Web3::Encoder::ABIDecodeTo<Ts...>(bytes));
     };
@@ -97,16 +99,16 @@ class Contract {
             args << "[{\"from\":\"" << from.asString() << "\",\"to\":\"" << to.asString() << "\",\"value\":\"" << value << "\",\"data\":\"" << data << "\"},\"latest\"]";
         }
         auto str = context->buildRPCJson("eth_estimateGas", args.str());
-        boost::json::value results;
+        boost::property_tree::ptree results;
         try {
             results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
         } catch (const std::exception &e) {
             throw std::runtime_error("Unable to estimate gas: " + std::string(e.what()));
         }
-        if (results.as_object().contains("error")) {
-            throw std::runtime_error("Unable to estimate gas: " + value_to<std::string>(results.at("error").at("message")));
+        if (results.get_child_optional( "error")) {
+            throw std::runtime_error("Unable to estimate gas: " + results.get<std::string>("error.message"));
         }
-        return value_to<std::string>(results.at("result"));
+        return results.get<std::string>("result");
     }
     std::string estimateGas(Address from, const char *value, const std::vector<unsigned char> &data, Address to = Address{}) {
         return estimateGas(from, value, toString(data).c_str(), to);
@@ -127,11 +129,13 @@ class Contract {
         }
         auto str = context->buildRPCJson("eth_estimateGas", "[" + optionBuilder(args) + ",\"latest\"]");
         auto handler = [func = std::move(func)](const std::string &str) {
-            auto results = boost::json::parse(str);
-            if (results.as_object().contains("error")) {
-                std::clog << "Unable to estimate gas: " + value_to<std::string>(results.at("error").at("message")) + "\n";
+            boost::iostreams::stream<boost::iostreams::array_source> stream(str.c_str(), str.size());
+            boost::property_tree::ptree results;
+            boost::property_tree::read_json(stream, results);
+            if (results.get_child_optional( "error")) {
+                std::clog << "Unable to estimate gas: " + results.get<std::string>("error.message") + "\n";
             } else {
-                func(value_to<std::string>(results.at("result")));
+                func(results.get<std::string>("result"));
             }
         };
         try {

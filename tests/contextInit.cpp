@@ -8,9 +8,16 @@
 #include "../base.h"
 #include "../account.h"
 
+#include <iostream>
+
 BOOST_AUTO_TEST_CASE(ContextInit) {
     try {
-        Web3::defaultContext = std::make_shared<Web3::Context>("127.0.0.1", "7545", 1);
+        Web3::defaultContext = std::make_shared<Web3::Context>(
+            boost::unit_test::framework::master_test_suite().argv[1],
+            boost::unit_test::framework::master_test_suite().argv[2],
+            std::stoul(boost::unit_test::framework::master_test_suite().argv[3]),
+            true
+        );
         // Web3::defaultContext = std::make_shared<Web3::Context>("rpc.sepolia.dev", "443", 11155111, true);
         Web3::defaultContext->run();
 
@@ -19,14 +26,17 @@ BOOST_AUTO_TEST_CASE(ContextInit) {
 
         std::timed_mutex testMutex;
 
+        // std::cout << "Transaction count: " << account->getTransactionCount() << std::endl;
+        // return;
         testMutex.lock();
         size_t nonce = std::numeric_limits<size_t>::max();
         account->getTransactionCount_async([&nonce, &testMutex](size_t value) {
             nonce = value;
+            std::cout << "Transaction count: " << value << std::endl;
             testMutex.unlock();
         });
 
-        BOOST_CHECK(testMutex.try_lock_until(std::chrono::system_clock::now() + std::chrono::seconds(5)));
+        BOOST_CHECK(testMutex.try_lock_until(std::chrono::system_clock::now() + std::chrono::seconds(15)));
         BOOST_CHECK(nonce == account->getTransactionCount());
     } catch (std::exception &e) {
         std::cout << "Error: " << e.what() << std::endl;

@@ -1,5 +1,6 @@
 // Well now this is a bit of a mess
-// I should have designed it before just coding it like a monkey
+// I should have designed it before just coding it like a monkey (Monkey no think, monkey just do)
+// (I will try and rewrite this at some point)
 
 import fs from "fs";
 import assert from "assert";
@@ -166,7 +167,9 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
 
 // Confusing, high class mess right here, hopefully I don't have to touch this except for adding support for other transaction types
 const caller_async = (tx: boolean, name: string, outputs: string[]) => {
-  return tx ? `
+  return `
+    std::shared_ptr<std::promise<return_type_t<F>>> promise;` +
+  (tx ? `
     std::shared_ptr<Web3::Account> signer;
     if (options.account) {
         signer = options.account;
@@ -190,11 +193,11 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
     if (options.gasLimit) {
         gasLimit = *options.gasLimit;
     }
-    auto rawSender = [address = this->address, context = this->context, signer, txValue, gasPrice, encoded, func = std::move(func)](size_t nonce, const boost::multiprecision::uint256_t &gasLimit) {
+    auto rawSender = [address = this->address, context = this->context, signer, txValue, gasPrice, encoded, func = std::move(func), promise](size_t nonce, const boost::multiprecision::uint256_t &gasLimit) {
         Web3::Transaction tx{nonce, gasPrice, gasLimit, address, txValue, encoded};
         auto signedTx = tx.sign(*signer);
         auto str = context->buildRPCJson("eth_sendRawTransaction", "[\\"0x" + Web3::toString(signedTx) + "\\"]");
-        std::make_shared<Web3::Net::AsyncRPC<decltype(func), false>>(context, std::move(func), std::move(str))->call();
+        std::make_shared<Web3::Net::AsyncRPC<decltype(func), false>>(context, std::move(func), std::move(str), promise)->call();
     };
     auto gasGetter = [address = this->address, context = this->context, gasMult = this->gasMult, signer, txValue, gasPrice, gasLimit, encoded, rawSender](size_t nonce) {
         if (gasLimit) {
@@ -224,12 +227,18 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
         {"to", address.asString()},
         {"data", "0x" + Web3::toString(encoded)}
     }) + ",\\"latest\\"]");
-    auto handler = Web3::CallWrapper<decltype(func), ${outputs.map(retType).join(", ")}>(std::move(func), "${name}");
     try {
-        std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
+        if constexpr (std::is_same_v<return_type_t<F>, void>) {
+            auto handler = Web3::CallWrapper<decltype(func), ${outputs.map(retType).join(", ")}>(std::move(func), "${name}");
+            std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
+        } else {
+            auto handler = Web3::CallWrapper<decltype(func), ${outputs.map(retType).join(", ")}>(std::move(func), "${name}", promise);
+            std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
+        }
     } catch (const std::exception &e) {
         throw std::runtime_error("Unable to call function (${name}): " + std::string(e.what()));
-    }`;
+    }`) + `
+    return promise;`;
 }
 
 const argLister = (argCount: number) => Array(argCount).fill(1).map((v:number, idx:number) => `arg${idx}`).join(", ");
@@ -285,7 +294,7 @@ parsed.filter((x: any) => x.type === "function").forEach((x: any) => {
   const mut = x.stateMutability;
   const signature = `${name}(${inputs.join(",")})`;
   const builder = indent(`inline auto ${name}(${comma(argTypes(inputs))}const Web3::CallOptions &options = {}) ${body(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
-  const builder_async = indent(`template <typename F> void ${name}_async(${comma(argTypes(inputs))}F &&func, const Web3::CallOptions &options = {}) ${body_async(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
+  const builder_async = indent(`template <typename F> std::shared_ptr<std::promise<return_type_t<F>>> ${name}_async(${comma(argTypes(inputs))}F &&func, const Web3::CallOptions &options = {}) ${body_async(inputs.length, signature, mut == "payable" || mut == "nonpayable", outputs)}`);
   console.log(builder);
   console.log(builder_async);
 });

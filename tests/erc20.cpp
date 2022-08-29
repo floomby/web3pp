@@ -12,8 +12,6 @@ BOOST_AUTO_TEST_CASE(Erc20, *boost::unit_test::depends_on("ContextInit")) {
     BOOST_CHECK(erc20_test.name() == "Something");
     BOOST_CHECK(erc20_test.symbol() == "SMT");
 
-    // I am dumb or something because I don't think I should need two syncronization primitives here, but I seem to be having compile ordering problems
-    // It appears the construction of approvedAmount is somehow drifting down below the closures or something (Idk I am lazy to read the assembly, and hate windows gdb suckyness)
     std::binary_semaphore testSemaphore(1);
     std::mutex testMutex;
     
@@ -29,7 +27,8 @@ BOOST_AUTO_TEST_CASE(Erc20, *boost::unit_test::depends_on("ContextInit")) {
         testSemaphore.release();
     });
 
-    BOOST_CHECK(testSemaphore.try_acquire_until(std::chrono::system_clock::now() + std::chrono::seconds(5)));
+    BOOST_CHECK(testSemaphore.try_acquire_for(std::chrono::seconds(5)));
+    std::clog << "Made it to here" << std::endl;
     BOOST_CHECK(decimals == 18);
 
     erc20_test.approve("0x1af831cf22600979B502f1b73392f41fc4328Dc4", Web3::Units::ether(1));
@@ -44,7 +43,7 @@ BOOST_AUTO_TEST_CASE(Erc20, *boost::unit_test::depends_on("ContextInit")) {
     erc20_test.approve_async("0xB2C049842476F85334ff58456CAc30ABa6b9B0b8", Web3::Units::gwei(40), [&erc20_test, handler = std::move(handler)](const std::string &res) {
         erc20_test.allowance_async(Web3::defaultContext->signers.front()->address, "0xB2C049842476F85334ff58456CAc30ABa6b9B0b8", std::move(handler));
     });
-    BOOST_CHECK(testSemaphore.try_acquire_until(std::chrono::system_clock::now() + std::chrono::seconds(6)));
+    BOOST_CHECK(testSemaphore.try_acquire_for(std::chrono::seconds(6)));
     testSemaphore.release();
     BOOST_CHECK(approvedAmount == Web3::Units::gwei(40));
 

@@ -36,10 +36,7 @@ BOOST_AUTO_TEST_CASE(ContextInit) {
 
         std::timed_mutex testMutex;
 
-        // std::binary_semaphore testSemaphore(1);
-        // testSemaphore.acquire();
         auto promise = account->getTransactionCount_async([](size_t value) {
-            std::cout << "Transaction count: " << value << std::endl;
             return value;
         });
 

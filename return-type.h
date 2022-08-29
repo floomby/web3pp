@@ -2,7 +2,9 @@
 
 #pragma once
 
-template <typename F> struct return_type_impl;
+template <typename F> struct return_type_impl {
+    using type = void;
+};
 
 template <typename R, typename... Args> struct return_type_impl<R(Args...)> {
   using type = R;

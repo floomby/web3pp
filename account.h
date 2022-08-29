@@ -340,7 +340,12 @@ class Account {
         auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");
         auto promise = std::make_shared<std::promise<return_type_t<F>>>();
         auto handler = [func = std::move(func), promise](boost::property_tree::ptree &&results) {
-            promise->set_value(func(std::stoul(results.get<std::string>("result"), nullptr, 16)));
+            if constexpr (std::is_same_v<return_type_t<F>, void>) {
+                func(std::stoul(results.get<std::string>("result"), nullptr, 16));
+                promise->set_value();
+            } else {
+                promise->set_value(func(std::stoul(results.get<std::string>("result"), nullptr, 16)));
+            }
         };
         std::make_shared<Web3::Net::AsyncRPC<decltype(handler), true>>(context, std::move(handler), std::move(str))->call();
         return promise;

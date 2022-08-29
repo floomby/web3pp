@@ -15,6 +15,7 @@
 
 #include "base.h"
 #include "utility.h"
+#include "return-type.h"
 
 namespace Web3 {
 namespace Net {
@@ -110,6 +111,7 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     F func;
     std::unique_ptr<boost::beast::tcp_stream> stream;
     std::unique_ptr<boost::beast::ssl_stream<boost::beast::tcp_stream>> sslStream;
+    std::shared_ptr<std::promise<return_type_t<F>>> promise;
 
    public:
     explicit AsyncRPC(std::shared_ptr<Context> context, F &&func, std::string &&rpcJson) : func(std::move(func)) {
@@ -126,6 +128,10 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
         } else {
             stream = std::make_unique<boost::beast::tcp_stream>(boost::asio::make_strand(context->ioContext));
         }
+    }
+
+    explicit AsyncRPC(std::shared_ptr<Context> context, F &&func, std::string &&rpcJson, std::shared_ptr<std::promise<return_type_t<F>>> promise) : AsyncRPC(context, std::move(func), std::move(rpcJson)) {
+        this->promise = promise;
     }
 
     void call() {
@@ -179,12 +185,22 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
                 boost::iostreams::stream<boost::iostreams::array_source> is(res_.body().data(), res_.body().size());
                 boost::property_tree::ptree pt;
                 boost::property_tree::read_json(is, pt);
-                func(std::move(pt));
+                if constexpr (std::is_same_v<return_type_t<F>, void>) {
+                    func(std::move(pt));
+                    promise->set_value();
+                } else {
+                    promise->set_value(func(std::move(pt)));
+                }
             } catch (const std::exception &e) {
                 std::cerr << "Error running async callback: " << e.what() << std::endl;
             }
         } else {
-            func(res_.body());
+            if constexpr (std::is_same_v<return_type_t<F>, void>) {
+                func(res_.body());
+                promise->set_value();
+            } else {
+                promise->set_value(func(res_.body()));
+            }
         }
 
         if (context_->useSsl) {

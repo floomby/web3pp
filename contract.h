@@ -14,7 +14,9 @@ namespace Web3 {
 template <typename F, typename... Ts> struct CallWrapper {
     std::string name;
     F f;
+    std::enable_if<!std::is_same_v<return_type_t<F>, void>, std::shared_ptr<std::promise<return_type_t<F>>>> promise;
     CallWrapper(F &&f, std::string &&name) : name(std::move(name)), f(std::move(f)) {}
+    CallWrapper(F &&f, std::string &&name, std::shared_ptr<std::promise<return_type_t<F>>> promise) : name(std::move(name)), f(std::move(f)), promise(promise) {}
     void operator()(const std::string &str){ 
         boost::iostreams::stream<boost::iostreams::array_source> stream(str.c_str(), str.size());
         boost::property_tree::ptree results;
@@ -24,7 +26,11 @@ template <typename F, typename... Ts> struct CallWrapper {
         }
         auto bytes = Web3::hexToBytes(results.get<std::string>("result"));
         // std::cout << "Result: " << toString(bytes) << std::endl;
-        f(Web3::Encoder::ABIDecodeTo<Ts...>(bytes));
+        if constexpr (std::is_same_v<return_type_t<F>, void>) {
+            f(Web3::Encoder::ABIDecodeTo<Ts...>(bytes));            
+        } else {
+            promise->set_value(f(Web3::Encoder::ABIDecodeTo<Ts...>(bytes)));
+        }
     };
 };
 

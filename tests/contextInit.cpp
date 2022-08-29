@@ -44,7 +44,7 @@ BOOST_AUTO_TEST_CASE(ContextInit) {
         future.wait();
         auto nonce = future.get();
 
-        // BOOST_CHECK(testSemaphore.try_acquire_for(std::chrono::seconds(5)));
+        std::this_thread::sleep_for(std::chrono::seconds(5));
         BOOST_CHECK(nonce == account->getTransactionCount());
     } catch (std::exception &e) {
         std::cout << "Error: " << e.what() << std::endl;

@@ -168,7 +168,7 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
 // Confusing, high class mess right here, hopefully I don't have to touch this except for adding support for other transaction types
 const caller_async = (tx: boolean, name: string, outputs: string[]) => {
   return `
-    std::shared_ptr<std::promise<return_type_t<F>>> promise;` +
+    auto promise = std::make_shared<std::promise<return_type_t<F>>>();` +
   (tx ? `
     std::shared_ptr<Web3::Account> signer;
     if (options.account) {
@@ -229,10 +229,10 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
     }) + ",\\"latest\\"]");
     try {
         if constexpr (std::is_same_v<return_type_t<F>, void>) {
-            auto handler = Web3::CallWrapper<decltype(func), ${outputs.map(retType).join(", ")}>(std::move(func), "${name}");
+            auto handler = Web3::CallWrapper<decltype(func), return_type_t<F>, ${outputs.map(retType).join(", ")}>(std::move(func), "${name}");
             std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
         } else {
-            auto handler = Web3::CallWrapper<decltype(func), ${outputs.map(retType).join(", ")}>(std::move(func), "${name}", promise);
+            auto handler = Web3::CallWrapper<decltype(func), return_type_t<F>, ${outputs.map(retType).join(", ")}>(std::move(func), "${name}", promise);
             std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
         }
     } catch (const std::exception &e) {

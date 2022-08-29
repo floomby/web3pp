@@ -320,7 +320,7 @@ class Account {
 
         return ret;
     }
-    
+
     size_t getTransactionCount() const {
         auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");
         boost::property_tree::ptree results;

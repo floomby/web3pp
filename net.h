@@ -187,9 +187,10 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
                 boost::property_tree::read_json(is, pt);
                 if constexpr (std::is_same_v<return_type_t<F>, void>) {
                     func(std::move(pt));
-                    promise->set_value();
+                    if (promise) promise->set_value();
                 } else {
-                    promise->set_value(func(std::move(pt)));
+                    if (promise) promise->set_value(func(std::move(pt)));
+                    else func(std::move(pt));
                 }
             } catch (const std::exception &e) {
                 std::cerr << "Error running async callback: " << e.what() << std::endl;
@@ -197,9 +198,10 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
         } else {
             if constexpr (std::is_same_v<return_type_t<F>, void>) {
                 func(res_.body());
-                promise->set_value();
+                if (promise) promise->set_value();
             } else {
-                promise->set_value(func(res_.body()));
+                if (promise) promise->set_value(func(res_.body()));
+                else func(res_.body());
             }
         }
 

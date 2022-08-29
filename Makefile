@@ -1,14 +1,14 @@
-# I have Wno-deprecated-declarations because as of version 3.0 OpenSSL low level ecdsa is deprecated for external use,
-# It is stated to continue to stay for internal use, so I am using it
+# I have Wno-deprecated-declarations because as of version 3.0 OpenSSL low level ecdsa is deprecated for external use.
+# It is stated to continue to stay for internal use (and is used internally a fair bit), so I am using it.
 
 TESTS_DIR := ./tests
 OBJ_DIR := ./objs
 SRC_FILES := $(wildcard $(TESTS_DIR)/*.cpp)
 OBJ_FILES := $(patsubst $(TESTS_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRC_FILES))
-LDFLAGS := -lssl -lcrypto -lboost_random -lboost_program_options -lboost_unit_test_framework -lboost_system
-CPPFLAGS := -Wall -Wno-deprecated-declarations -pedantic -std=gnu++23 -ggdb -fdiagnostics-color
+LDFLAGS := -lssl -lcrypto -lboost_random -lboost_program_options -lboost_unit_test_framework -lboost_system -fsanitize=address
+CPPFLAGS := -Wall -Wno-deprecated-declarations -pedantic -std=gnu++23 -ggdb -fdiagnostics-color -fsanitize=address
 
-# linux-test: objs/contextInit.o
+# linux-test: objs/contextInit.o objs/erc20.o
 linux-test: $(OBJ_FILES)
 	g++ -o $@ $^ $(LDFLAGS)	
 

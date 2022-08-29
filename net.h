@@ -33,7 +33,7 @@ class RPCRequest {
     boost::beast::flat_buffer buffer_;
 
     inline void init() {
-        req_.version(11);
+        req_.version(12);
         req_.target("/");
         req_.method(boost::beast::http::verb::post);
         req_.set(boost::beast::http::field::host, context_->hostString());
@@ -85,8 +85,7 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
         boost::beast::http::write(*stream, req_);
         boost::beast::http::read(*stream, buffer_, res_);
 
-        const char *buf = "{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":\"0x0000000000000000000000000000000000000000000000000000000000000005\"}";
-        boost::iostreams::stream<boost::iostreams::array_source> stream2(buf, strlen(buf));
+        boost::iostreams::stream<boost::iostreams::array_source> stream2(res_.body().c_str(), res_.body().size());
         boost::property_tree::ptree results;
         boost::property_tree::read_json(stream2, results);
 
@@ -217,7 +216,13 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_shutdown(boost::beast::error_code ec) {
-        if (ec) return fail(ec, "shutdown");
+        if (ec) {
+            if (ec == boost::asio::ssl::error::stream_truncated) {
+                ec = {};
+            } else {
+                return fail(ec, "shutdown");
+            }
+        }
     }
 };
 

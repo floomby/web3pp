@@ -20,7 +20,7 @@ int main(int argc, char* argv[], char* envp[]) {
 BOOST_AUTO_TEST_CASE(ContextInit) {
     try {
         std::cout << "Connecting to " << boost::unit_test::framework::master_test_suite().argv[1]
-            << " on port " << boost::unit_test::framework::master_test_suite().argv[2] 
+            << " on port " << boost::unit_test::framework::master_test_suite().argv[2]
             << " with chain id of " << boost::unit_test::framework::master_test_suite().argv[3] << std::endl;
 
         Web3::defaultContext = std::make_shared<Web3::Context>(
@@ -36,18 +36,18 @@ BOOST_AUTO_TEST_CASE(ContextInit) {
 
         std::timed_mutex testMutex;
 
-        // std::cout << "Transaction count: " << account->getTransactionCount() << std::endl;
-        // return;
-
-        testMutex.lock();
-        size_t nonce = std::numeric_limits<size_t>::max();
-        account->getTransactionCount_async([&nonce, &testMutex](size_t value) {
-            nonce = value;
+        // std::binary_semaphore testSemaphore(1);
+        // testSemaphore.acquire();
+        auto promise = account->getTransactionCount_async([](size_t value) {
             std::cout << "Transaction count: " << value << std::endl;
-            testMutex.unlock();
+            return value;
         });
 
-        BOOST_CHECK(testMutex.try_lock_until(std::chrono::system_clock::now() + std::chrono::seconds(60)));
+        auto future = promise->get_future();
+        future.wait();
+        auto nonce = future.get();
+
+        // BOOST_CHECK(testSemaphore.try_acquire_for(std::chrono::seconds(5)));
         BOOST_CHECK(nonce == account->getTransactionCount());
     } catch (std::exception &e) {
         std::cout << "Error: " << e.what() << std::endl;

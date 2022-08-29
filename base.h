@@ -62,7 +62,7 @@ struct Context {
     std::thread runnerThread;
     std::list<std::shared_ptr<Account>> signers;
     inline explicit Context(std::string host, std::string port, unsigned chainId, bool useSsl = false)
-        : host(host), port(port), chainId(chainId), ioContext(), resolver(ioContext), endpoints(resolver.resolve(host, port)), sslContext(boost::asio::ssl::context::tlsv13_client), useSsl(useSsl) {
+        : host(host), port(port), chainId(chainId), ioContext(), resolver(ioContext), endpoints(resolver.resolve(host, port)), sslContext(boost::asio::ssl::context::tlsv12_client), useSsl(useSsl) {
         crypto.group = EC_GROUP_new_by_curve_name(NID_secp256k1);
         const char *pMinusN = "432420386565659656852420866390673177326";
         BN_dec2bn(&crypto.pMinusN, pMinusN);

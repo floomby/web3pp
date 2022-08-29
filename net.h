@@ -105,7 +105,6 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
     }
 };
 
-// TODO Add ssl to this
 template <typename F, bool ParseResult = false>
 class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, RPCRequest {
     F func;
@@ -119,11 +118,6 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
         init();
         if (context_->useSsl) {
             sslStream = std::make_unique<boost::beast::ssl_stream<boost::beast::tcp_stream>>(boost::asio::make_strand(context_->ioContext), context_->sslContext);
-            // if (!SSL_set_tlsext_host_name(sslStream->native_handle(), context_->host.c_str())) {
-            //     boost::beast::error_code ec{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()};
-            //     std::cerr << ec.message() << "\n";
-            //     return;
-            // }
             std::cout << "Connecting to " << context_->host << ":" << context_->port << std::endl;
             if (!SSL_set_tlsext_host_name(sslStream->native_handle(), context_->host.c_str())) {
                 boost::beast::error_code ec{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()};

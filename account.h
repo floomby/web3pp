@@ -6,6 +6,8 @@
 #include "utility.h"
 #include "transactionHash.h"
 
+#include "return-type.h"
+
 namespace Web3 {
 
 struct Signature {
@@ -224,23 +226,6 @@ class Account {
 
         auto parity = BN_is_odd(y) ? 1 : 0;
 
-        // std::cout << "Parity: " << parity << std::endl;
-        // std::cout << "priv: ";
-        // BN_print_fp(stdout, priv);
-        // std::cout << std::endl;
-        // std::cout << "order: ";
-        // BN_print_fp(stdout, order);
-        // std::cout << std::endl;
-        // std::cout << "x: ";
-        // BN_print_fp(stdout, x);
-        // std::cout << std::endl;
-        // std::cout << "y: ";
-        // BN_print_fp(stdout, y);
-        // std::cout << std::endl;
-        // std::cout << "h: ";
-        // BN_print_fp(stdout, h);
-        // std::cout << std::endl;
-
         if (!BN_mod_mul(y, x, priv, order, ctx)) {
             BN_free(x);
             BN_free(y);
@@ -351,12 +336,14 @@ class Account {
     }
 
     template <typename F>
-    void getTransactionCount_async(F &&func) const {
+    std::shared_ptr<std::promise<return_type_t<F>>> getTransactionCount_async(F &&func) const {
         auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");
-        auto handler = [func = std::move(func)](boost::property_tree::ptree &&results) {
-            func(std::stoul(results.get<std::string>("result"), nullptr, 16));
+        auto promise = std::make_shared<std::promise<return_type_t<F>>>();
+        auto handler = [func = std::move(func), promise](boost::property_tree::ptree &&results) {
+            promise->set_value(func(std::stoul(results.get<std::string>("result"), nullptr, 16)));
         };
         std::make_shared<Web3::Net::AsyncRPC<decltype(handler), true>>(context, std::move(handler), std::move(str))->call();
+        return promise;
     }
 
     Address deployedContract(size_t nonce) const {

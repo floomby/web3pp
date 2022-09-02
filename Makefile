@@ -8,7 +8,7 @@ OBJ_FILES := $(patsubst $(TESTS_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRC_FILES))
 LDFLAGS := -lssl -lcrypto -lboost_random -lboost_program_options -lboost_unit_test_framework -lboost_system -fsanitize=address
 CPPFLAGS := -Wall -Wno-deprecated-declarations -pedantic -std=gnu++23 -ggdb -fdiagnostics-color -fsanitize=address
 
-# linux-test: objs/contextInit.o objs/erc20.o
+# linux-test: objs/contextInit.o
 linux-test: $(OBJ_FILES)
 	g++ -o $@ $^ $(LDFLAGS)	
 

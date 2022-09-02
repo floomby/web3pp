@@ -136,10 +136,9 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
         gasPrice = Web3::Units::gwei(10);
     }
     Web3::Transaction tx{nonce, gasPrice, gasLimit, this->address, txValue, encoded};
-    auto signedTx = tx.sign(*signer);
+    auto signedTx = signer->signTx(tx);
     auto h = Web3::Ethereum::sendRawTransaction(Web3::toString(signedTx));
-    std::cout << "Hash: " << h << std::endl;
-    h.getReceipt();` : `
+    return h.getReceipt();` : `
     std::shared_ptr<Web3::Account> signer;
     if (options.account) {
         signer = options.account;
@@ -195,7 +194,7 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
     }
     auto rawSender = [address = this->address, context = this->context, signer, txValue, gasPrice, encoded, func = std::move(func), promise](size_t nonce, const boost::multiprecision::uint256_t &gasLimit) {
         Web3::Transaction tx{nonce, gasPrice, gasLimit, address, txValue, encoded};
-        auto signedTx = tx.sign(*signer);
+        auto signedTx = signer->signTx(tx);
         auto str = context->buildRPCJson("eth_sendRawTransaction", "[\\"0x" + Web3::toString(signedTx) + "\\"]");
         std::make_shared<Web3::Net::AsyncRPC<decltype(func), false>>(context, std::move(func), std::move(str), promise)->call();
     };
@@ -207,7 +206,7 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
                 boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gasEstimation).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
                 rawSender(nonce, gasF.convert_to<boost::multiprecision::uint256_t>());
             };
-            Web3::Contract::estimateGas_async(std::move(handler), signer->address, Web3::toString(txValue).c_str(), encoded, address, context);
+            Web3::GasEstimator::estimateGas_async(std::move(handler), signer->address, Web3::toString(txValue).c_str(), encoded, address, context);
         }
     };
     if (options.nonce) {

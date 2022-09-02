@@ -21,6 +21,8 @@ BOOST_AUTO_TEST_CASE(Erc20, *boost::unit_test::depends_on("ContextInit")) {
 
     BOOST_CHECK(future0.get() == 18);
 
+    // std::cout << "Receipt: " << std::endl;
+    // boost::property_tree::write_json(std::cout, erc20_test.approve("0x1af831cf22600979B502f1b73392f41fc4328Dc4", Web3::Units::ether(1)));
     erc20_test.approve("0x1af831cf22600979B502f1b73392f41fc4328Dc4", Web3::Units::ether(1));
     BOOST_CHECK(Web3::Units::ether(1) == erc20_test.allowance(Web3::defaultContext->signers.front()->address, "0x1af831cf22600979B502f1b73392f41fc4328Dc4"));
 

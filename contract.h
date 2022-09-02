@@ -8,6 +8,7 @@
 #include "ethereum.h"
 #include "transaction.h"
 #include "units.h"
+#include "gasEstimator.h"
 
 namespace Web3 {
 
@@ -39,7 +40,7 @@ template <typename F, typename P, typename... Ts> struct CallWrapper {
 // TODO deploy should not be a template because that defeats the purpose of having this static typing
 class Contract {
    protected:
-    template<typename...Ts> void deploy(const CallOptions &options, Ts... args) {
+    template<typename...Ts> auto deploy(const CallOptions &options, Ts... args) {
         // TODO find gas price and estimate gas
         auto encoded = Web3::Encoder::ABIEncode(args...);
         std::string data = __data() + toString(encoded);
@@ -77,11 +78,10 @@ class Contract {
             if (!context || context->signers.empty()) throw std::runtime_error("No primary signer set");
             signer = context->signers.front();
         }
-        auto signedTx = tx.sign(*signer);
+        auto signedTx = signer->signTx(tx);
         auto h = Ethereum::sendRawTransaction(Web3::toString(signedTx));
-        std::cout << "Hash: " << h << std::endl;
         address = signer->deployedContract(nonce);
-        h.getReceipt();
+        return h.getReceipt();
     }
     const boost::multiprecision::cpp_dec_float_50 gasMult = boost::multiprecision::cpp_dec_float_50(1.2);
     std::shared_ptr<Context> context;
@@ -119,41 +119,6 @@ class Contract {
     }
     std::string estimateGas(Address from, const char *value, const std::vector<unsigned char> &data, Address to = Address{}) {
         return estimateGas(from, value, toString(data).c_str(), to);
-    }
-    // This needs to be static since we are using it in other async code where the object may have been destroyed and we want to avoid dereferencing a bad this pointer
-    template <typename F>
-    static void estimateGas_async(F &&func, Address from, const char *value = "", const char *data = "", Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
-        std::vector<std::pair<std::string, std::string>> args;
-        args.push_back(std::make_pair("from", from.asString()));
-        if (strlen(value) > 0) {
-            args.push_back(std::make_pair("value", value));
-        }
-        if (strlen(data) > 0) {
-            args.push_back(std::make_pair("data", data));
-        }
-        if (!to.isZero()) {
-            args.push_back(std::make_pair("to", to.asString()));
-        }
-        auto str = context->buildRPCJson("eth_estimateGas", "[" + optionBuilder(args) + ",\"latest\"]");
-        auto handler = [func = std::move(func)](const std::string &str) {
-            boost::iostreams::stream<boost::iostreams::array_source> stream(str.c_str(), str.size());
-            boost::property_tree::ptree results;
-            boost::property_tree::read_json(stream, results);
-            if (results.get_child_optional( "error")) {
-                std::clog << "Unable to estimate gas: " + results.get<std::string>("error.message") + "\n";
-            } else {
-                func(results.get<std::string>("result"));
-            }
-        };
-        try {
-            std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
-        } catch (const std::exception &e) {
-            std::clog << "Unable to estimate gas: " + std::string(e.what()) << std::endl;
-        }
-    }
-    template <typename F>
-    static void estimateGas_async(F &&func, Address from, const char *value, const std::vector<unsigned char> &data, Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
-        estimateGas_async(std::move(func), from, value, toString(data).c_str(), to, context);
     }
 };
 

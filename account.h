@@ -1,22 +1,22 @@
 #pragma once
 
+#include <boost/multiprecision/cpp_dec_float.hpp>
+
 #include "base.h"
 #include "encoder.h"
 #include "net.h"
 #include "utility.h"
 #include "transactionHash.h"
+#include "callOptions.h"
+#include "units.h"
+#include "transaction.h"
+#include "gasEstimator.h"
 
 #include "return-type.h"
 
 namespace Web3 {
 
-struct Signature {
-    std::vector<unsigned char> v;
-    std::vector<unsigned char> r;
-    std::vector<unsigned char> s;
-};
-
-class Account {
+class Account : public std::enable_shared_from_this<Account> {
     EC_KEY *privateKey = nullptr;
     std::shared_ptr<Context> context;
 
@@ -321,6 +321,36 @@ class Account {
         return ret;
     }
 
+    std::vector<unsigned char> signTx(const Transaction &tx, std::shared_ptr<Context> context = nullptr) {
+        Encoder::RLPEncodeInput nonce(integralToBytes(tx.nonce));
+        Encoder::RLPEncodeInput gasPrice(integralToBytes(tx.gasPrice));
+        Encoder::RLPEncodeInput gasLimit(integralToBytes(tx.gasLimit));
+        Encoder::RLPEncodeInput to = tx.to ? Encoder::RLPEncodeInput(*tx.to) : Encoder::RLPEncodeInput(std::vector<unsigned char>());
+        Encoder::RLPEncodeInput value(integralToBytes(tx.value));
+        Encoder::RLPEncodeInput chainId(integralToBytes(context ? context->chainId : defaultContext->chainId));
+        Encoder::RLPEncodeInput empty(std::vector<unsigned char>({}));
+
+        Encoder::RLPEncodeInput txrlp({ nonce, gasPrice, gasLimit, to, value, tx.data, chainId, empty, empty });
+        auto txrlpEncoded = Encoder::encode(txrlp);
+        auto txrlpHash = keccak256(txrlpEncoded);
+        auto sig = this->sign(txrlpHash);
+
+        // std::cout << "RLP Encoded: " << toString(txrlpEncoded) << std::endl;
+        // std::cout << "RLP Hash: " << toString(txrlpHash) << std::endl;
+        // std::cout << "Signature: " << sig << std::endl;
+
+        unpadFront(sig.r);
+        unpadFront(sig.s);
+        unpadFront(sig.v);
+
+        Encoder::RLPEncodeInput vEnc(sig.v);
+        Encoder::RLPEncodeInput rEnc(sig.r);
+        Encoder::RLPEncodeInput sEnc(sig.s);
+
+        Encoder::RLPEncodeInput signedTx({ nonce, gasPrice, gasLimit, to, value, tx.data, vEnc, rEnc, sEnc });
+        return Encoder::encode(signedTx);
+    }
+
     size_t getTransactionCount() const {
         auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");
         boost::property_tree::ptree results;
@@ -355,6 +385,69 @@ class Account {
         auto tmp = keccak256_v(Encoder::RLPEncode(this->address, nonce));
         tmp.erase(tmp.begin(), tmp.begin() + 12);
         return Address(tmp);
+    }
+
+    // This feels wrong being here (that is what I get for flexibility)
+    const boost::multiprecision::cpp_dec_float_50 gasMult = boost::multiprecision::cpp_dec_float_50(1.2);
+
+    // FIXME This almost works as an abstraction for the code that the generator emits for async stuff
+    template <typename F> std::shared_ptr<std::promise<return_type_t<F>>> send_async(const Address &to, F &&func, const CallOptions &options = {}, const std::vector<unsigned char> &data = {}) {
+        auto promise = std::make_shared<std::promise<return_type_t<F>>>();
+
+        std::shared_ptr<Account> signer;
+        if (options.account) {
+            signer = options.account;
+        } else {
+            signer = shared_from_this();
+        }
+
+        if (!signer->canSign()) throw std::runtime_error("Account is unable to sign transactions");
+        if (signer->address.isZero()) throw std::runtime_error("Unable to send transaction from zero address");
+
+        boost::multiprecision::uint256_t txValue;
+        if (options.value) {
+            txValue = *options.value;
+        } else {
+            txValue = 0;
+        }
+
+        boost::multiprecision::uint256_t gasPrice;
+        if (options.gasPrice) {
+            gasPrice = *options.gasPrice;
+        } else {
+            gasPrice = Units::gwei(10);
+        }
+        std::optional<boost::multiprecision::uint256_t> gasLimit = std::nullopt;
+        if (options.gasLimit) {
+            gasLimit = *options.gasLimit;
+        }
+        auto rawSender = [to, context = this->context, signer, txValue, gasPrice, data, func = std::move(func), promise](size_t nonce, const boost::multiprecision::uint256_t &gasLimit) {
+            Transaction tx{nonce, gasPrice, gasLimit, to, txValue, data};
+            auto signedTx = signer->signTx(tx);
+            auto str = context->buildRPCJson("eth_sendRawTransaction", "[\"0x" + toString(signedTx) + "\"]");
+            std::make_shared<Net::AsyncRPC<decltype(func), true>>(context, std::move(func), std::move(str), promise)->call();
+        };
+        auto gasGetter = [to, context = this->context, gasMult = this->gasMult, signer, txValue, gasPrice, gasLimit, data, rawSender](size_t nonce) {
+            if (gasLimit || data.empty()) {
+                if (!gasLimit) {
+                    rawSender(nonce, 21000);
+                } else {
+                    rawSender(nonce, *gasLimit);
+                }
+            } else {
+                auto handler = [rawSender, nonce, gasMult](const std::string &gasEstimation) {
+                    boost::multiprecision::cpp_dec_float_50 gasF = fromString(gasEstimation).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
+                    rawSender(nonce, gasF.convert_to<boost::multiprecision::uint256_t>());
+                };
+                GasEstimator::estimateGas_async(std::move(handler), signer->address, toString(txValue).c_str(), data, to, context);
+            }
+        };
+        if (options.nonce) {
+            gasGetter(*options.nonce);
+        } else {
+            signer->getTransactionCount_async(std::move(gasGetter));
+        }
+        return promise;
     }
 };
 

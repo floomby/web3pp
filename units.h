@@ -10,7 +10,7 @@ inline boost::multiprecision::uint256_t gwei(const boost::multiprecision::uint25
 }
 
 inline boost::multiprecision::uint256_t ether(const boost::multiprecision::uint256_t &value) {
-    return value * 1000000000000000000;
+    return value * 1000000000000000000ULL;
 }
 
 }  // namespace Units

@@ -8,7 +8,7 @@ namespace Web3 {
 struct TransactionHash {
     std::shared_ptr<Context> context;
     std::string hash;
-    void getReceipt() {
+    auto getReceipt() {
         auto str = context->buildRPCJson("eth_getTransactionReceipt", "[\"" + hash + "\"]");
         boost::property_tree::ptree results;
         try {
@@ -19,7 +19,7 @@ struct TransactionHash {
         if (results.get_child_optional( "error")) {
             throw std::runtime_error("Unable to get transaction receipt: " + results.get<std::string>("error.message"));
         }
-        // std::cout << "Receipt: " << results.at("result") << std::endl;
+        return results.get_child("result");
     }
 };
 }

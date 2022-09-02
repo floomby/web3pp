@@ -54,7 +54,7 @@ class Contract {
         if (options.gasLimit) {
             txGas = *options.gasLimit;
         } else {
-            auto gas = this->estimateGas(context->signers.front()->address, "0", data.c_str());
+            auto gas = GasEstimator::estimateGas(context->signers.front()->address, "0", data.c_str(), {}, this->context);
             boost::multiprecision::cpp_dec_float_50 gasF = fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
             txGas = gasF.convert_to<boost::multiprecision::uint256_t>();
         }
@@ -97,28 +97,6 @@ class Contract {
     }
     Contract(Address &&address, std::shared_ptr<Context> context) : context(context), address(std::move(address)) {
         if (!context) throw std::runtime_error("Contract construction requires valid context");
-    }
-    std::string estimateGas(Address from, const char *value, const char *data = "", Address to = Address{}) {
-        std::stringstream args;
-        if (to.isZero()) {
-            args << "[{\"from\":\"" << from.asString() << "\",\"value\":\"" << value << "\",\"data\":\"" << data << "\"},\"latest\"]";
-        } else {
-            args << "[{\"from\":\"" << from.asString() << "\",\"to\":\"" << to.asString() << "\",\"value\":\"" << value << "\",\"data\":\"" << data << "\"},\"latest\"]";
-        }
-        auto str = context->buildRPCJson("eth_estimateGas", args.str());
-        boost::property_tree::ptree results;
-        try {
-            results = std::make_shared<Web3::Net::SyncRPC>(context, std::move(str))->call();
-        } catch (const std::exception &e) {
-            throw std::runtime_error("Unable to estimate gas: " + std::string(e.what()));
-        }
-        if (results.get_child_optional( "error")) {
-            throw std::runtime_error("Unable to estimate gas: " + results.get<std::string>("error.message"));
-        }
-        return results.get<std::string>("result");
-    }
-    std::string estimateGas(Address from, const char *value, const std::vector<unsigned char> &data, Address to = Address{}) {
-        return estimateGas(from, value, toString(data).c_str(), to);
     }
 };
 

@@ -44,13 +44,20 @@ BOOST_AUTO_TEST_CASE(ContextInit) {
         future.wait();
         auto nonce = future.get();
 
-        auto promise0 = account->send_async("0xbcc18C958EaE2fd41E21B59Efc626205d8982107", [](boost::property_tree::ptree &&pt){ return std::move(pt); }, { .value = Web3::Units::ether(1) } );
+        auto otherAccount = std::make_shared<Web3::Account>(Web3::Address{"0xbcc18C958EaE2fd41E21B59Efc626205d8982107"});
+        auto balance = otherAccount->getBalance();
+
+        auto promise0 = account->send_async(otherAccount->address, [](boost::property_tree::ptree &&pt){ return std::move(pt); }, { .value = Web3::Units::ether(1) } );
 
         auto future0 = promise0->get_future();
         future0.wait();
         auto tx0 = future0.get();
 
-        BOOST_CHECK(nonce + 1 == account->getTransactionCount());
+        account->send(otherAccount->address, { .value = Web3::Units::ether(1) } );
+
+        BOOST_CHECK(balance + Web3::Units::ether(2) == otherAccount->getBalance());
+
+        BOOST_CHECK(nonce + 2 == account->getTransactionCount());
     } catch (std::exception &e) {
         std::cout << "Error: " << e.what() << std::endl;
         BOOST_CHECK(false);

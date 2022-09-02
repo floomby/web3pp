@@ -1,19 +1,16 @@
 ## Web3pp
 
-Header only Ethereum interaction library for c++. Creates a typesafe interface to interact with contracts (think hardhat typechain) by means of a code generator (written in typescript). The synchronous code works well. The async interface experimental.
+Header only Ethereum interaction library for c++. Creates a typesafe interface to interact with contracts (analogous to typechain) by means of a code generator (written in typescript). Includes a promise based async interface as well as a synchronous interface.
 
-This library depends only on some boost libraries and openssl.
+This library is intentionally light on dependencies requiring only some boost libraries and openssl.
 
-Documentation is missing, but look at the `setup-test.sh` script and the `tests/erc20.cpp` file to see an example.
-
-**NOTE: This currently does not compile with clang or msvc.**
+**NOTE: Only tested with gcc, clang may work with some small effort. MSVC is probably further off.**
 
 ### High priority TODOs
 
-* Call options testing coverage is poor (value, gas override, gas price)
 * Get reasonable documentation
-* Better testing coverage (generally, we always could use this...)
-* Asan is complaining I leak some ssl stuff - (I really should fix this)
+* Better testing coverage
+* Asan is complaining about leaking some ssl stuff - (I really should fix this)
 
 ### More things I need to finish
 
@@ -27,10 +24,9 @@ Documentation is missing, but look at the `setup-test.sh` script and the `tests/
 * Some utility stuff (ecrecover, direct storage access, address checksums)
 * Eip1559 and eip2930 transaction support
 
-### Chores
+### Known issues
 
-* Make some examples that are documented!
 * Thrown exceptions in async code break things (it ruins the work queue)
 * Make it compile under clang (It is throwing up on the template metaprogramming code as it is right now)
-* The code generator for creating the c++ code from the abi is a pile of junk (Definitely in the running for my top 10 worst piles of junk I have made)
-* Compilation is really slow and causes gcc to use insane amounts of memory (I am 95% sure it is the template resolution and I have ideas on how to fix it)
+* The code generator could use some refactoring (There is new code in the account class that can be used to simplify this)
+* Compilation is really slow and causes gcc to use large amounts of memory (I am 95% sure it is the template resolution and I have ideas on how to fix it)

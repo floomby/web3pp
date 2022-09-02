@@ -125,7 +125,7 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
     if (options.gasLimit) {
         gasLimit = *options.gasLimit;
     } else {
-        auto gas = this->estimateGas(signer->address, Web3::toString(txValue).c_str(), encoded, this->address);
+        auto gas = Web3::GasEstimator::estimateGas(signer->address, Web3::toString(txValue).c_str(), encoded, this->address, this->context);
         boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
         gasLimit = gasF.convert_to<boost::multiprecision::uint256_t>();
     }

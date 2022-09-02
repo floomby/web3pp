@@ -387,7 +387,7 @@ class Account : public std::enable_shared_from_this<Account> {
         return Address(tmp);
     }
 
-    // This feels wrong being here (that is what I get for flexibility)
+    // This feels wrong being here and in the contract abstract class (this is what I get for allowing send to be used for contract calls)
     const boost::multiprecision::cpp_dec_float_50 gasMult = boost::multiprecision::cpp_dec_float_50(1.2);
 
     // FIXME This almost works as an abstraction for the code that the generator emits for async stuff
@@ -449,6 +449,59 @@ class Account : public std::enable_shared_from_this<Account> {
         }
         return promise;
     }
+
+    auto send(const Address &to, const CallOptions &options = {}, const std::vector<unsigned char> &data = {}) {
+        std::shared_ptr<Account> signer;
+        if (options.account) {
+            signer = options.account;
+        } else {
+            signer = shared_from_this();
+        }
+
+        if (!signer->canSign()) throw std::runtime_error("Account is unable to sign transactions");
+        if (signer->address.isZero()) throw std::runtime_error("Unable to send transaction from zero address");
+    
+        boost::multiprecision::uint256_t gasLimit;
+        boost::multiprecision::uint256_t txValue;
+        if (options.value) {
+            txValue = *options.value;
+        } else {
+            txValue = 0;
+        }
+        
+        size_t nonce;
+        if (options.nonce) {
+            nonce = *options.nonce;
+        } else {
+            nonce = signer->getTransactionCount();
+        }
+        if (options.gasLimit) {
+            gasLimit = *options.gasLimit;
+        } else {
+            if (data.empty()) {
+                gasLimit = 21000;
+            } else {
+                auto gas = GasEstimator::estimateGas(signer->address, toString(txValue).c_str(), data, to, this->context);
+                boost::multiprecision::cpp_dec_float_50 gasF = fromString(gas).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
+                gasLimit = gasF.convert_to<boost::multiprecision::uint256_t>();
+            }
+        }
+        boost::multiprecision::uint256_t gasPrice;
+        if (options.gasPrice) {
+            gasPrice = *options.gasPrice;
+        } else {
+            gasPrice = Units::gwei(10);
+        }
+        Transaction tx{nonce, gasPrice, gasLimit, to, txValue, data};
+        auto signedTx = signer->signTx(tx);
+        auto h = Ethereum::sendRawTransaction(toString(signedTx));
+        return h.getReceipt();
+    }
+
+    // I already have too many implicit conversions, I don't need this one
+    // operator Address() const {
+    //     return address;
+    // }
 };
 
 }  // namespace Web3

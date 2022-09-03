@@ -1,6 +1,5 @@
-// Well now this is a bit of a mess
-// I should have designed it before just coding it like a monkey (Monkey no think, monkey just do)
-// (I will try and rewrite this at some point)
+// TODO I will refactor this using the more abstract send methods from the account class
+// It is hard to work with this right now because I did not do any thinking before I started coding
 
 import fs from "fs";
 import assert from "assert";
@@ -164,7 +163,7 @@ const caller = (tx: boolean, name: string, outputs: string[]) => {
     return Web3::Encoder::ABIDecodeTo<true, ${outputs.map(retType).join(", ")}>(bytes);`;
 }
 
-// Confusing, high class mess right here, hopefully I don't have to touch this except for adding support for other transaction types
+// A bit messy
 const caller_async = (tx: boolean, name: string, outputs: string[]) => {
   return `
     auto promise = std::make_shared<std::promise<return_type_t<F>>>();` +

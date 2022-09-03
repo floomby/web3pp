@@ -44,6 +44,12 @@ BOOST_AUTO_TEST_CASE(ContextInit) {
         future.wait();
         auto nonce = future.get();
 
+        // We only run the sending test if we have a funded account (i.e. we are using ganache)
+        if (account->getBalance() < Web3::Units::ether(3)) {
+            BOOST_CHECK(nonce == account->getTransactionCount());
+            return;
+        }
+
         auto otherAccount = std::make_shared<Web3::Account>(Web3::Address{"0xbcc18C958EaE2fd41E21B59Efc626205d8982107"});
         auto balance = otherAccount->getBalance();
 

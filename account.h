@@ -497,11 +497,6 @@ class Account : public std::enable_shared_from_this<Account> {
         auto h = Ethereum::sendRawTransaction(toString(signedTx));
         return h.getReceipt();
     }
-
-    // I already have too many implicit conversions, I don't need this one
-    // operator Address() const {
-    //     return address;
-    // }
 };
 
 }  // namespace Web3

@@ -6,8 +6,9 @@
 namespace Web3 {
 struct GasEstimator {
     template <typename F, typename P = std::shared_ptr<std::promise<void>>>
-    static void estimateGas_async(F &&func, Address from, P promiseSharedPtr = nullptr, const char *value = "", const char *data = "", Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
+    static std::shared_ptr<std::promise<return_type_t<F>>> estimateGas_async(F &&func, Address from, P promiseSharedPtr = nullptr, const char *value = "", const char *data = "", Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
         std::vector<std::pair<std::string, std::string>> args;
+        auto promise = std::make_shared<std::promise<return_type_t<F>>>();
         args.push_back(std::make_pair("from", from.asString()));
         if (strlen(value) > 0) {
             args.push_back(std::make_pair("value", value));
@@ -19,17 +20,31 @@ struct GasEstimator {
             args.push_back(std::make_pair("to", to.asString()));
         }
         auto str = context->buildRPCJson("eth_estimateGas", "[" + optionBuilder(args) + ",\"latest\"]");
-        auto handler = [func = std::move(func)](const std::string &str) {
+        auto handler = [func = std::move(func), promise, promiseSharedPtr](const std::string &str) {
             boost::iostreams::stream<boost::iostreams::array_source> stream(str.c_str(), str.size());
             boost::property_tree::ptree results;
             boost::property_tree::read_json(stream, results);
             if (results.get_child_optional( "error")) {
-                throw std::runtime_error("Unable to estimate gas: " + results.get<std::string>("error.message"));
+                if (promiseSharedPtr) {
+                    promiseSharedPtr->set_exception(std::make_exception_ptr("Unable to estimate gas: " + results.get<std::string>("error.message")));
+                } else {
+                    promise->set_exception(std::make_exception_ptr("Unable to estimate gas: " + results.get<std::string>("error.message")));
+                }
             } else {
-                func(results.get<std::string>("result"));
+                if constexpr (std::is_same_v<return_type_t<F>, void>) {
+                    func(results.get<std::string>("result"));
+                    promise->set_value();
+                } else {
+                    promise->set_value(func(results.get<std::string>("result")));
+                }
             }
         };
-        std::make_shared<Net::AsyncRPC<P, decltype(handler)>>(promiseSharedPtr, context, std::move(handler), std::move(str))->call();
+        if (promiseSharedPtr) {
+            std::make_shared<Net::AsyncRPC<P, decltype(handler)>>(promiseSharedPtr, context, std::move(handler), std::move(str))->call();
+        } else {
+            std::make_shared<Net::AsyncRPC<decltype(promise), decltype(handler)>>(promise, context, std::move(handler), std::move(str))->call();
+        }
+        return promise;
     }
     template <typename F, typename P = std::shared_ptr<std::promise<void>>>
     static void estimateGas_async(F &&func, Address from, P promiseSharedPtr, const char *value, const std::vector<unsigned char> &data, Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {

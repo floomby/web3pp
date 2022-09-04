@@ -377,7 +377,11 @@ class Account : public std::enable_shared_from_this<Account> {
                 promise->set_value(func(std::stoul(results.get<std::string>("result"), nullptr, 16)));
             }
         };
-        std::make_shared<Web3::Net::AsyncRPC<P, decltype(handler), true>>(promiseSharedPtr, context, std::move(handler), std::move(str))->call();
+        if (promiseSharedPtr) {
+            std::make_shared<Web3::Net::AsyncRPC<P, decltype(handler), true>>(promiseSharedPtr, context, std::move(handler), std::move(str))->call();
+        } else {
+            std::make_shared<Web3::Net::AsyncRPC<decltype(promise), decltype(handler), true>>(promise, context, std::move(handler), std::move(str))->call();
+        }
         return promise;
     }
 

@@ -18,11 +18,11 @@
 #include "return-type.h"
 
 namespace Web3 {
-namespace Net {
 
-inline void fail(const boost::beast::error_code &ec, char const *what) {
-    std::cerr << what << ":> " << ec.message() << std::endl;
-}
+template <class T> struct is_promise_shared_ptr : std::false_type {};
+template <class T> struct is_promise_shared_ptr<std::shared_ptr<std::promise<T>>> : std::true_type {};
+
+namespace Net {
 
 class RPCRequest {
    protected:
@@ -115,12 +115,12 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>
 
    public:
     explicit AsyncRPC(P top, std::shared_ptr<Context> context, F &&func, std::string &&rpcJson) : topLevelPromise(top), func(std::move(func)) {
+        static_assert(is_promise_shared_ptr<P>::value, "Must pass in a shared pointer to top level promise for exception handling");
         context_ = context;
         json_ = std::move(rpcJson);
         init();
         if (context_->useSsl) {
             sslStream = std::make_unique<boost::beast::ssl_stream<boost::beast::tcp_stream>>(boost::asio::make_strand(context_->ioContext), context_->sslContext);
-            std::cout << "Connecting to " << context_->host << ":" << context_->port << std::endl;
             if (!SSL_set_tlsext_host_name(sslStream->native_handle(), context_->host.c_str())) {
                 boost::beast::error_code ec{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()};
                 if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
@@ -131,6 +131,7 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>
     }
 
     explicit AsyncRPC(P top, std::shared_ptr<Context> context, F &&func, std::string &&rpcJson, std::shared_ptr<std::promise<return_type_t<F>>> promise) : AsyncRPC(top, context, std::move(func), std::move(rpcJson)) {
+        static_assert(is_promise_shared_ptr<P>::value, "Must pass in a shared pointer to top level promise for exception handling");
         this->promise = promise;
     }
 

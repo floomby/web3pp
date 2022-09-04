@@ -105,15 +105,16 @@ class SyncRPC : public std::enable_shared_from_this<SyncRPC>, RPCRequest {
     }
 };
 
-template <typename F, bool ParseResult = false>
-class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, RPCRequest {
+template <typename P, typename F, bool ParseResult = false>
+class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>>, RPCRequest {
+    P topLevelPromise;
     F func;
     std::unique_ptr<boost::beast::tcp_stream> stream;
     std::unique_ptr<boost::beast::ssl_stream<boost::beast::tcp_stream>> sslStream;
     std::shared_ptr<std::promise<return_type_t<F>>> promise;
 
    public:
-    explicit AsyncRPC(std::shared_ptr<Context> context, F &&func, std::string &&rpcJson) : func(std::move(func)) {
+    explicit AsyncRPC(P top, std::shared_ptr<Context> context, F &&func, std::string &&rpcJson) : topLevelPromise(top), func(std::move(func)) {
         context_ = context;
         json_ = std::move(rpcJson);
         init();
@@ -122,14 +123,14 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
             std::cout << "Connecting to " << context_->host << ":" << context_->port << std::endl;
             if (!SSL_set_tlsext_host_name(sslStream->native_handle(), context_->host.c_str())) {
                 boost::beast::error_code ec{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()};
-                throw boost::beast::system_error{ec};
+                if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
             }
         } else {
             stream = std::make_unique<boost::beast::tcp_stream>(boost::asio::make_strand(context->ioContext));
         }
     }
 
-    explicit AsyncRPC(std::shared_ptr<Context> context, F &&func, std::string &&rpcJson, std::shared_ptr<std::promise<return_type_t<F>>> promise) : AsyncRPC(context, std::move(func), std::move(rpcJson)) {
+    explicit AsyncRPC(P top, std::shared_ptr<Context> context, F &&func, std::string &&rpcJson, std::shared_ptr<std::promise<return_type_t<F>>> promise) : AsyncRPC(top, context, std::move(func), std::move(rpcJson)) {
         this->promise = promise;
     }
 
@@ -144,7 +145,10 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type) {
-        if (ec) return fail(ec, "connect");
+        if (ec) {
+            if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
+            return;
+        }
 
         if (context_->useSsl) {
             boost::beast::get_lowest_layer(*sslStream).expires_after(std::chrono::seconds(30));
@@ -156,7 +160,10 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     }
 
     void on_handshake(boost::beast::error_code ec) {
-        if (ec) return fail(ec, "handshake");
+        if (ec) {
+            if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
+            return;
+        }
 
         boost::beast::get_lowest_layer(*sslStream).expires_after(std::chrono::seconds(30));
         boost::beast::http::async_write(*sslStream, req_, boost::beast::bind_front_handler(&AsyncRPC::on_write, this->shared_from_this()));
@@ -165,7 +172,10 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     void on_write(boost::beast::error_code ec, std::size_t bytes_transferred) {
         boost::ignore_unused(bytes_transferred);
 
-        if (ec) return fail(ec, "write");
+        if (ec) {
+            if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
+            return;
+        }
 
         if (context_->useSsl) {
             boost::beast::http::async_read(*sslStream, buffer_, res_, boost::beast::bind_front_handler(&AsyncRPC::on_read, this->shared_from_this()));
@@ -177,10 +187,13 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
     void on_read(boost::beast::error_code ec, std::size_t bytes_transferred) {
         boost::ignore_unused(bytes_transferred);
 
-        if (ec) return fail(ec, "read");
+        if (ec) {
+            if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
+            return;
+        };
 
-        if constexpr (ParseResult) {
-            try {
+        try {
+            if constexpr (ParseResult) {
                 boost::iostreams::stream<boost::iostreams::array_source> is(res_.body().data(), res_.body().size());
                 boost::property_tree::ptree pt;
                 boost::property_tree::read_json(is, pt);
@@ -191,17 +204,17 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
                     if (promise) promise->set_value(func(std::move(pt)));
                     else func(std::move(pt));
                 }
-            } catch (const std::exception &e) {
-                std::cerr << "Error running async callback: " << e.what() << std::endl;
-            }
-        } else {
-            if constexpr (std::is_same_v<return_type_t<F>, void>) {
-                func(res_.body());
-                if (promise) promise->set_value();
             } else {
-                if (promise) promise->set_value(func(res_.body()));
-                else func(res_.body());
+                if constexpr (std::is_same_v<return_type_t<F>, void>) {
+                    func(res_.body());
+                    if (promise) promise->set_value();
+                } else {
+                    if (promise) promise->set_value(func(res_.body()));
+                    else func(res_.body());
+                }
             }
+        } catch (...) {
+            if (topLevelPromise) topLevelPromise->set_exception(std::current_exception());
         }
 
         if (context_->useSsl) {
@@ -212,15 +225,20 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<F, ParseResult>>, 
         stream->socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
 
         // not_connected happens sometimes so don't bother reporting it.
-        if (ec && ec != boost::beast::errc::not_connected) return fail(ec, "shutdown");
+        if (ec && ec != boost::beast::errc::not_connected) {
+            if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
+            return;
+        };
     }
 
     void on_shutdown(boost::beast::error_code ec) {
         if (ec) {
+            // Deal with non-compliant SSL implementations (There is a good reason so many are non-compliant)
             if (ec == boost::asio::ssl::error::stream_truncated) {
                 ec = {};
             } else {
-                return fail(ec, "shutdown");
+                if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
+                return;
             }
         }
     }

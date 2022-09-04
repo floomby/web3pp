@@ -47,7 +47,6 @@ It is noteworthy that on windows it uses the windows system certificate store fo
 
 ### Known issues
 
-* Thrown exceptions in async code break things (it ruins the work queue) - I intend to fix this by wrapping the promise returns in a variant and resolving the promise to the exception.
 * Make it compile under clang (It is failing right now, some errors from boost code, some from mine, I have not investigated at all really)
 * The code generator could use some refactoring (There is new code in the account class that can be used to simplify this)
 * Asan is complaining about leaking some ssl stuff - (Should be easy fixes)

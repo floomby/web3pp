@@ -5,8 +5,8 @@
 
 namespace Web3 {
 struct GasEstimator {
-    template <typename F>
-    static void estimateGas_async(F &&func, Address from, const char *value = "", const char *data = "", Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
+    template <typename F, typename P = std::shared_ptr<std::promise<void>>>
+    static void estimateGas_async(F &&func, Address from, P promiseSharedPtr = nullptr, const char *value = "", const char *data = "", Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
         std::vector<std::pair<std::string, std::string>> args;
         args.push_back(std::make_pair("from", from.asString()));
         if (strlen(value) > 0) {
@@ -24,20 +24,16 @@ struct GasEstimator {
             boost::property_tree::ptree results;
             boost::property_tree::read_json(stream, results);
             if (results.get_child_optional( "error")) {
-                std::clog << "Unable to estimate gas: " + results.get<std::string>("error.message") + "\n";
+                throw std::runtime_error("Unable to estimate gas: " + results.get<std::string>("error.message"));
             } else {
                 func(results.get<std::string>("result"));
             }
         };
-        try {
-            std::make_shared<Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
-        } catch (const std::exception &e) {
-            std::clog << "Unable to estimate gas: " + std::string(e.what()) << std::endl;
-        }
+        std::make_shared<Net::AsyncRPC<P, decltype(handler)>>(promiseSharedPtr, context, std::move(handler), std::move(str))->call();
     }
-    template <typename F>
-    static void estimateGas_async(F &&func, Address from, const char *value, const std::vector<unsigned char> &data, Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
-        estimateGas_async(std::move(func), from, value, toString(data).c_str(), to, context);
+    template <typename F, typename P = std::shared_ptr<std::promise<void>>>
+    static void estimateGas_async(F &&func, Address from, P promiseSharedPtr, const char *value, const std::vector<unsigned char> &data, Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
+        estimateGas_async(std::move(func), from, promiseSharedPtr, value, toString(data).c_str(), to, context);
     }
     static std::string estimateGas(Address from, const char *value, const char *data = "", Address to = Address{}, std::shared_ptr<Context> context = defaultContext) {
         std::stringstream args;

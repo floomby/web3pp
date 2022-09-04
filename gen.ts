@@ -195,9 +195,9 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
         Web3::Transaction tx{nonce, gasPrice, gasLimit, address, txValue, encoded};
         auto signedTx = signer->signTx(tx);
         auto str = context->buildRPCJson("eth_sendRawTransaction", "[\\"0x" + Web3::toString(signedTx) + "\\"]");
-        std::make_shared<Web3::Net::AsyncRPC<decltype(func), false>>(context, std::move(func), std::move(str), promise)->call();
+        std::make_shared<Web3::Net::AsyncRPC<decltype(promise), decltype(func), false>>(promise, context, std::move(func), std::move(str), promise)->call();
     };
-    auto gasGetter = [address = this->address, context = this->context, gasMult = this->gasMult, signer, txValue, gasPrice, gasLimit, encoded, rawSender](size_t nonce) {
+    auto gasGetter = [address = this->address, context = this->context, gasMult = this->gasMult, signer, txValue, gasPrice, gasLimit, encoded, rawSender, promise](size_t nonce) {
         if (gasLimit) {
             rawSender(nonce, *gasLimit);
         } else {
@@ -205,7 +205,7 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
                 boost::multiprecision::cpp_dec_float_50 gasF = Web3::fromString(gasEstimation).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
                 rawSender(nonce, gasF.convert_to<boost::multiprecision::uint256_t>());
             };
-            Web3::GasEstimator::estimateGas_async(std::move(handler), signer->address, Web3::toString(txValue).c_str(), encoded, address, context);
+            Web3::GasEstimator::estimateGas_async(std::move(handler), signer->address, promise, Web3::toString(txValue).c_str(), encoded, address, context);
         }
     };
     if (options.nonce) {
@@ -228,13 +228,13 @@ const caller_async = (tx: boolean, name: string, outputs: string[]) => {
     try {
         if constexpr (std::is_same_v<return_type_t<F>, void>) {
             auto handler = Web3::CallWrapper<decltype(func), return_type_t<F>, ${outputs.map(retType).join(", ")}>(std::move(func), "${name}");
-            std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
+            std::make_shared<Web3::Net::AsyncRPC<decltype(promise), decltype(handler)>>(promise, context, std::move(handler), std::move(str))->call();
         } else {
             auto handler = Web3::CallWrapper<decltype(func), return_type_t<F>, ${outputs.map(retType).join(", ")}>(std::move(func), "${name}", promise);
-            std::make_shared<Web3::Net::AsyncRPC<decltype(handler)>>(context, std::move(handler), std::move(str))->call();
+            std::make_shared<Web3::Net::AsyncRPC<decltype(promise), decltype(handler)>>(promise, context, std::move(handler), std::move(str))->call();
         }
-    } catch (const std::exception &e) {
-        throw std::runtime_error("Unable to call function (${name}): " + std::string(e.what()));
+    } catch (...) {
+        promise->set_exception(std::current_exception());
     }`) + `
     return promise;`;
 }

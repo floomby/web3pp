@@ -365,8 +365,8 @@ class Account : public std::enable_shared_from_this<Account> {
         return std::stoul(results.get<std::string>("result"), nullptr, 16);
     }
 
-    template <typename F>
-    std::shared_ptr<std::promise<return_type_t<F>>> getTransactionCount_async(F &&func) const {
+    template <typename F, typename P = std::shared_ptr<std::promise<void>>>
+    std::shared_ptr<std::promise<return_type_t<F>>> getTransactionCount_async(F &&func, P promiseSharedPtr = nullptr) const {
         auto str = context->buildRPCJson("eth_getTransactionCount", "[\"0x" + this->getAddress() + "\", \"latest\"]");
         auto promise = std::make_shared<std::promise<return_type_t<F>>>();
         auto handler = [func = std::move(func), promise](boost::property_tree::ptree &&results) {
@@ -377,7 +377,7 @@ class Account : public std::enable_shared_from_this<Account> {
                 promise->set_value(func(std::stoul(results.get<std::string>("result"), nullptr, 16)));
             }
         };
-        std::make_shared<Web3::Net::AsyncRPC<decltype(handler), true>>(context, std::move(handler), std::move(str))->call();
+        std::make_shared<Web3::Net::AsyncRPC<P, decltype(handler), true>>(promiseSharedPtr, context, std::move(handler), std::move(str))->call();
         return promise;
     }
 
@@ -425,9 +425,9 @@ class Account : public std::enable_shared_from_this<Account> {
             Transaction tx{nonce, gasPrice, gasLimit, to, txValue, data};
             auto signedTx = signer->signTx(tx);
             auto str = context->buildRPCJson("eth_sendRawTransaction", "[\"0x" + toString(signedTx) + "\"]");
-            std::make_shared<Net::AsyncRPC<decltype(func), true>>(context, std::move(func), std::move(str), promise)->call();
+            std::make_shared<Net::AsyncRPC<decltype(promise), decltype(func), true>>(promise, context, std::move(func), std::move(str), promise)->call();
         };
-        auto gasGetter = [to, context = this->context, gasMult = this->gasMult, signer, txValue, gasPrice, gasLimit, data, rawSender](size_t nonce) {
+        auto gasGetter = [to, context = this->context, gasMult = this->gasMult, signer, txValue, gasPrice, gasLimit, data, rawSender, promise](size_t nonce) {
             if (gasLimit || data.empty()) {
                 if (!gasLimit) {
                     rawSender(nonce, 21000);
@@ -439,13 +439,13 @@ class Account : public std::enable_shared_from_this<Account> {
                     boost::multiprecision::cpp_dec_float_50 gasF = fromString(gasEstimation).convert_to<boost::multiprecision::cpp_dec_float_50>() * gasMult;
                     rawSender(nonce, gasF.convert_to<boost::multiprecision::uint256_t>());
                 };
-                GasEstimator::estimateGas_async(std::move(handler), signer->address, toString(txValue).c_str(), data, to, context);
+                GasEstimator::estimateGas_async(std::move(handler), signer->address, promise, toString(txValue).c_str(), data, to, context);
             }
         };
         if (options.nonce) {
             gasGetter(*options.nonce);
         } else {
-            signer->getTransactionCount_async(std::move(gasGetter));
+            signer->getTransactionCount_async(std::move(gasGetter), promise);
         }
         return promise;
     }

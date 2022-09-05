@@ -123,6 +123,9 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>
             sslStream = std::make_unique<boost::beast::ssl_stream<boost::beast::tcp_stream>>(boost::asio::make_strand(context_->ioContext), context_->sslContext);
             if (!SSL_set_tlsext_host_name(sslStream->native_handle(), context_->host.c_str())) {
                 boost::beast::error_code ec{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()};
+#ifdef NETWORKING_DEBUG
+                std::clog << "Error at " << __FILE__ << ":" << __LINE__ << "  in  " << __FUNCTION__ << "  " << ec.message() << std::endl;
+#endif
                 if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
             }
         } else {
@@ -147,6 +150,9 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>
 
     void on_connect(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type) {
         if (ec) {
+#ifdef NETWORKING_DEBUG
+            std::clog << "Error at " << __FILE__ << ":" << __LINE__ << "  in  " << __FUNCTION__ << "  " << ec.message() << std::endl;
+#endif
             if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
             return;
         }
@@ -162,6 +168,9 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>
 
     void on_handshake(boost::beast::error_code ec) {
         if (ec) {
+#ifdef NETWORKING_DEBUG
+            std::clog << "Error at " << __FILE__ << ":" << __LINE__ << "  in  " << __FUNCTION__ << "  " << ec.message() << std::endl;
+#endif
             if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
             return;
         }
@@ -174,6 +183,9 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>
         boost::ignore_unused(bytes_transferred);
 
         if (ec) {
+#ifdef NETWORKING_DEBUG
+            std::clog << "Error at " << __FILE__ << ":" << __LINE__ << "  in  " << __FUNCTION__ << "  " << ec.message() << std::endl;
+#endif
             if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
             return;
         }
@@ -189,6 +201,9 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>
         boost::ignore_unused(bytes_transferred);
 
         if (ec) {
+#ifdef NETWORKING_DEBUG
+            std::clog << "Error at " << __FILE__ << ":" << __LINE__ << "  in  " << __FUNCTION__ << "  " << ec.message() << std::endl;
+#endif
             if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
             return;
         };
@@ -215,6 +230,9 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>
                 }
             }
         } catch (...) {
+#ifdef NETWORKING_DEBUG
+            std::clog << "Error at " << __FILE__ << ":" << __LINE__ << "  in  " << __FUNCTION__ << "  " << ec.message() << std::endl;
+#endif
             if (topLevelPromise) topLevelPromise->set_exception(std::current_exception());
         }
 
@@ -227,6 +245,9 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>
 
         // not_connected happens sometimes so don't bother reporting it.
         if (ec && ec != boost::beast::errc::not_connected) {
+#ifdef NETWORKING_DEBUG
+            std::clog << "Error at " << __FILE__ << ":" << __LINE__ << "  in  " << __FUNCTION__ << "  " << ec.message() << std::endl;
+#endif
             if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
             return;
         };
@@ -238,6 +259,9 @@ class AsyncRPC : public std::enable_shared_from_this<AsyncRPC<P, F, ParseResult>
             if (ec == boost::asio::ssl::error::stream_truncated) {
                 ec = {};
             } else {
+#ifdef NETWORKING_DEBUG
+            std::clog << "Error at " << __FILE__ << ":" << __LINE__ << "  in  " << __FUNCTION__ << "  " << ec.message() << std::endl;
+#endif
                 if (topLevelPromise) topLevelPromise->set_exception(std::make_exception_ptr(boost::beast::system_error{ec}));
                 return;
             }

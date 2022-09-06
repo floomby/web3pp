@@ -10,6 +10,7 @@ LDFLAGS_WIN := -lssl -lcrypto -lboost_random-mt -lboost_program_options-mt -lws2
 CPPFLAGS := -Wall -Wno-deprecated-declarations -pedantic -std=gnu++23 -ggdb -fdiagnostics-color -DNETWORKING_DEBUG
 
 tests: build-prep linux-test
+windows: build-prep windows-test
 
 linux-test: $(OBJ_FILES)
 	g++ -o $@ $^ $(LDFLAGS)
@@ -23,7 +24,6 @@ $(OBJ_DIR)/%.o: $(TESTS_DIR)/%.cpp
 
 clean:
 	rm $(OBJ_DIR)/*.o
-#	rm linux-test
 
 windows-test: $(OBJ_FILES)
 	g++ -o $@ $^ $(LDFLAGS_WIN)	

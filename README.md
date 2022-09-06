@@ -20,7 +20,7 @@ Vyper (easy to install through pip), solcjs, and node are required to compile th
 
 make
 # or alternatively if on windows
-make windows-test
+make windows
 
 # The tests are can be run against gananche (It is easy enough to use them with something else though, just change the keys/accounts in the test)
 ganache-cli --port 7545 -m "volcano again sheriff turtle wealth theme short assume island course knee cheese" --chainId 1
@@ -34,16 +34,15 @@ On windows I recommend building with building against msys2 using the msys2 buil
 
 It is noteworthy that on windows it uses the windows system certificate store for ssl rather than the openssl store. On all platforms it will reject invalid certificates and refuse to connect.
 
-### Things on the roadmap
+### Roadmap
 
-* Get reasonable documentation
-* Improving testing coverage
 * Event subscriptions/past event searching
 * Improve how transaction receipts are handled
 * Allow getting pending transactions
 * Websocket support
-* Some utility stuff (ecrecover, direct storage access, address checksums)
+* Some utility stuff (ecrecover, direct storage reads, address checksums)
 * Eip1559 and eip2930 transaction support
+* Get reasonable documentation
 
 ### Known issues
 
